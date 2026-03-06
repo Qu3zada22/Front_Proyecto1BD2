@@ -1,13 +1,20 @@
 import { useEffect } from "react"
-import { useNavigate, Link, Outlet } from "react-router-dom"
-import { ShoppingCart, User, ClipboardList, LogOut, Search } from "lucide-react"
+import { useNavigate, Link, Outlet, useLocation } from "react-router-dom"
+import { ShoppingCart, LogOut, Home, ClipboardList, MessageSquare } from "lucide-react"
 import { Logo } from "@/components/fastpochi/logo"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 import { useAuth, useCart } from "@/lib/store"
+
+const NAV_ITEMS = [
+  { to: "/cliente", icon: Home, label: "Home", exact: true },
+  { to: "/cliente/pedidos", icon: ClipboardList, label: "Mis Pedidos" },
+  { to: "/cliente/resenas", icon: MessageSquare, label: "Mis Reseñas" },
+]
 
 export default function ClienteLayout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, logout } = useAuth()
   const { itemCount } = useCart()
 
@@ -17,21 +24,44 @@ export default function ClienteLayout() {
 
   if (!user) return null
 
+  const isActive = (to: string, exact?: boolean) =>
+    exact ? location.pathname === to : location.pathname.startsWith(to)
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Link to="/cliente"><Logo size="sm" /></Link>
-          <div className="hidden max-w-sm flex-1 px-6 md:block">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Buscar restaurantes..." className="pl-9" />
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to="/cliente/pedidos"><ClipboardList size={20} /></Link>
-            </Button>
+          <nav className="flex items-center gap-1">
+            {NAV_ITEMS.map(({ to, icon: Icon, label, exact }) => (
+              <Button
+                key={to}
+                variant="ghost"
+                size="sm"
+                asChild
+                className={cn(
+                  "hidden gap-1.5 md:flex",
+                  isActive(to, exact) && "bg-accent text-accent-foreground"
+                )}
+              >
+                <Link to={to}>
+                  <Icon size={16} />
+                  <span className="text-xs">{label}</span>
+                </Link>
+              </Button>
+            ))}
+            {/* Mobile: icon-only nav */}
+            {NAV_ITEMS.map(({ to, icon: Icon, exact }) => (
+              <Button
+                key={`mob-${to}`}
+                variant="ghost"
+                size="icon"
+                asChild
+                className={cn("md:hidden", isActive(to, exact) && "bg-accent text-accent-foreground")}
+              >
+                <Link to={to}><Icon size={20} /></Link>
+              </Button>
+            ))}
             <Button variant="ghost" size="icon" className="relative" asChild>
               <Link to="/cliente/carrito">
                 <ShoppingCart size={20} />
@@ -42,13 +72,10 @@ export default function ClienteLayout() {
                 )}
               </Link>
             </Button>
-            <Button variant="ghost" size="icon" asChild>
-              <Link to="/cliente/perfil"><User size={20} /></Link>
-            </Button>
             <Button variant="ghost" size="icon" onClick={() => { logout(); navigate("/") }}>
               <LogOut size={20} />
             </Button>
-          </div>
+          </nav>
         </div>
       </header>
       <main><Outlet /></main>

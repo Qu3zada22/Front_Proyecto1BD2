@@ -19,6 +19,7 @@ import ClientePedidos from "@/pages/cliente/ClientePedidos"
 import ClienteCarrito from "@/pages/cliente/ClienteCarrito"
 import ClienteRestaurante from "@/pages/cliente/ClienteRestaurante"
 import ClientePedidoTracking from "@/pages/cliente/ClientePedidoTracking"
+import ClienteResenas from "@/pages/cliente/ClienteResenas"
 
 // Propietario
 import PropietarioLayout from "@/pages/propietario/PropietarioLayout"
@@ -52,6 +53,7 @@ export default function App() {
                 <Route path="carrito" element={<ClienteCarrito />} />
                 <Route path="restaurante/:id" element={<ClienteRestaurante />} />
                 <Route path="pedido/:id" element={<ClientePedidoTracking />} />
+                <Route path="resenas" element={<ClienteResenas />} />
               </Route>
 
               {/* Propietario */}

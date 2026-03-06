@@ -482,6 +482,28 @@ export const ordenesIniciales: Orden[] = [
     tiene_resena: true
   },
   {
+    _id: "o1b",
+    usuario_id: "u1",
+    restaurante_id: "r2",
+    items: [
+      { item_id: "mi8", nombre: "BBQ Bacon Burger", precio_unitario: 85, cantidad: 1, subtotal: 85 },
+      { item_id: "mi9", nombre: "Papas Fritas Clasicas", precio_unitario: 30, cantidad: 1, subtotal: 30 },
+      { item_id: "mi11", nombre: "Limonada Natural", precio_unitario: 20, cantidad: 1, subtotal: 20 }
+    ],
+    estado: "entregado",
+    historial_estados: [
+      { estado: "pendiente", timestamp: "2026-01-10T19:00:00Z", actor_id: "u1" },
+      { estado: "en_proceso", timestamp: "2026-01-10T19:10:00Z", actor_id: "u5" },
+      { estado: "en_camino", timestamp: "2026-01-10T19:35:00Z", actor_id: "u5" },
+      { estado: "entregado", timestamp: "2026-01-10T19:55:00Z", actor_id: "u5" }
+    ],
+    total: 135,
+    direccion_entrega: { alias: "Casa", calle: "4a Avenida 12-34, Zona 10", ciudad: "Guatemala", pais: "GT" },
+    fecha_creacion: "2026-01-10T19:00:00Z",
+    fecha_entrega_real: "2026-01-10T19:55:00Z",
+    tiene_resena: false
+  },
+  {
     _id: "o2",
     usuario_id: "u2",
     restaurante_id: "r3",

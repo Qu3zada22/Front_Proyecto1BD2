@@ -113,6 +113,8 @@ interface DataContextType {
   // Reviews
   addResena: (resena: Omit<Resena, "_id" | "fecha" | "activa" | "likes">) => void
   toggleResenaActiva: (id: string) => void
+  toggleLikeResena: (resenaId: string, userId: string) => void
+  deleteResenas: (ids: string[]) => void
 
   // Notifications
   markNotificationRead: (id: string) => void
@@ -294,6 +296,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setResenas((prev) => prev.map((r) => r._id === id ? { ...r, activa: !r.activa } : r))
   }, [])
 
+  const deleteResenas = useCallback((ids: string[]) => {
+    setResenas((prev) => prev.filter((r) => !ids.includes(r._id)))
+    // Unmark tiene_resena on affected orders
+    setOrdenes((prev) => prev.map((o) => {
+      const resena = resenas.find((r) => ids.includes(r._id) && r.orden_id === o._id)
+      return resena ? { ...o, tiene_resena: false } : o
+    }))
+  }, [resenas])
+
+  const toggleLikeResena = useCallback((resenaId: string, userId: string) => {
+    setResenas((prev) => prev.map((r) => {
+      if (r._id !== resenaId) return r
+      const hasLike = r.likes.includes(userId)
+      return { ...r, likes: hasLike ? r.likes.filter((id) => id !== userId) : [...r.likes, userId] }
+    }))
+  }, [])
+
   // --- Notifications ---
   const markNotificationRead = useCallback((id: string) => {
     setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, leida: true } : n))
@@ -309,7 +328,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addRestaurante, toggleRestauranteActivo,
       addMenuItem, updateMenuItem, deleteMenuItem, toggleMenuItemDisponible,
       createOrder, advanceOrderStatus, cancelOrder,
-      addResena, toggleResenaActiva,
+      addResena, toggleResenaActiva, toggleLikeResena, deleteResenas,
       markNotificationRead, markAllNotificationsRead,
     }}>
       {children}
