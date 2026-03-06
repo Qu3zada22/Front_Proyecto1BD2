@@ -41,10 +41,10 @@ export default function App() {
               {/* Admin */}
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboard />} />
-                <Route path="restaurantes" element={<AdminRestaurantes />} />
-                <Route path="usuarios" element={<AdminUsuarios />} />
-                <Route path="resenas" element={<AdminResenas />} />
-                <Route path="reportes" element={<AdminReportes />} />
+                {/* <Route path="restaurantes" element={<AdminRestaurantes />} /> */}
+                {/* <Route path="usuarios" element={<AdminUsuarios />} /> */}
+                {/* <Route path="resenas" element={<AdminResenas />} /> */}
+                {/* <Route path="reportes" element={<AdminReportes />} /> */}
               </Route>
 
               {/* Cliente */}

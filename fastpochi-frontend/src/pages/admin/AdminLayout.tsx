@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useLocation, Link, Outlet } from "react-router-dom"
-import { BarChart3, Store, Users, Star, Settings, LogOut, Menu, X } from "lucide-react"
+import { BarChart3, Store, Users, Star, TrendingUp, LogOut, Menu, X } from "lucide-react"
 import { Logo } from "@/components/fastpochi/logo"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/store"
@@ -8,10 +8,10 @@ import { cn } from "@/lib/utils"
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/admin", icon: BarChart3 },
-  { label: "Restaurantes", href: "/admin/restaurantes", icon: Store },
-  { label: "Usuarios", href: "/admin/usuarios", icon: Users },
-  { label: "Resenas", href: "/admin/resenas", icon: Star },
-  { label: "Reportes", href: "/admin/reportes", icon: Settings },
+  // { label: "Restaurantes", href: "/admin/restaurantes", icon: Store },
+  // { label: "Usuarios", href: "/admin/usuarios", icon: Users },
+  // { label: "Resenas", href: "/admin/resenas", icon: Star },
+  // { label: "Reportes", href: "/admin/reportes", icon: TrendingUp },
 ]
 
 export default function AdminLayout() {

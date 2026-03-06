@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from "react"
 import {
-  usuarios,
+  usuarios as usuariosData,
   restaurantes as restaurantesData,
   menuItems as menuItemsData,
   ordenesIniciales,
@@ -29,7 +29,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Usuario | null>(null)
-  const [allUsers, setAllUsers] = useState<Usuario[]>(usuarios)
+  const [allUsers, setAllUsers] = useState<Usuario[]>(usuariosData)
 
   const login = useCallback((email: string, password: string) => {
     const found = allUsers.find((u) => u.email === email && u.activo)
@@ -94,6 +94,11 @@ interface DataContextType {
   ordenes: Orden[]
   resenas: Resena[]
   notifications: Notification[]
+  // Admin user management
+  adminUsers: Usuario[]
+  toggleUserActivo: (id: string) => void
+  deleteUser: (id: string) => void
+  deleteUsers: (ids: string[]) => void
 
   // Restaurant CRUD
   addRestaurante: (r: Omit<Restaurante, "_id" | "fecha_creacion" | "calificacion_prom" | "total_resenas" | "activo">) => void
@@ -135,6 +140,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [ordenes, setOrdenes] = useState<Orden[]>(ordenesIniciales)
   const [resenas, setResenas] = useState<Resena[]>(resenasIniciales)
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [adminUsers, setAdminUsers] = useState<Usuario[]>(usuariosData)
 
   // --- Restaurants ---
   const addRestaurante = useCallback((r: Omit<Restaurante, "_id" | "fecha_creacion" | "calificacion_prom" | "total_resenas" | "activo">) => {
@@ -326,6 +332,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }))
   }, [resenas])
 
+  const toggleUserActivo = useCallback((id: string) => {
+    setAdminUsers((prev) => prev.map((u) => u._id === id ? { ...u, activo: !u.activo } : u))
+  }, [])
+
+  const deleteUser = useCallback((id: string) => {
+    setAdminUsers((prev) => prev.filter((u) => u._id !== id))
+  }, [])
+
+  const deleteUsers = useCallback((ids: string[]) => {
+    setAdminUsers((prev) => prev.filter((u) => !ids.includes(u._id)))
+  }, [])
+
   const toggleLikeResena = useCallback((resenaId: string, userId: string) => {
     setResenas((prev) => prev.map((r) => {
       if (r._id !== resenaId) return r
@@ -346,6 +364,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   return (
     <DataContext.Provider value={{
       restaurantes, menuItems: menuItemsList, ordenes, resenas, notifications,
+      adminUsers, toggleUserActivo, deleteUser, deleteUsers,
       addRestaurante, updateRestaurante, deleteRestaurante, toggleRestauranteActivo,
       addMenuItem, updateMenuItem, deleteMenuItem, deleteMenuItems, toggleMenuItemDisponible, setMenuItemsDisponible,
       createOrder, advanceOrderStatus, cancelOrder,

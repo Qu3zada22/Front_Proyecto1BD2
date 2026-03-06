@@ -1,16 +1,18 @@
 import { useState } from "react"
-import { Search, ToggleLeft, ToggleRight } from "lucide-react"
+import { Search, ToggleLeft, ToggleRight, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { StarRating } from "@/components/fastpochi/star-rating"
 import { StatusBadge } from "@/components/fastpochi/status-badge"
 import { useData } from "@/lib/store"
 import { usuarios } from "@/lib/mock-data"
 
 export default function AdminRestaurantesPage() {
-  const { restaurantes, toggleRestauranteActivo } = useData()
+  const { restaurantes, toggleRestauranteActivo, deleteRestaurante } = useData()
   const [search, setSearch] = useState("")
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const filtered = restaurantes.filter((r) =>
     r.nombre.toLowerCase().includes(search.toLowerCase()) ||
@@ -73,16 +75,38 @@ export default function AdminRestaurantesPage() {
                   <StatusBadge status={r.activo ? "activo" : "inactivo"} />
                 </td>
                 <td className="py-3 text-center">
-                  <Button variant="ghost" size="sm" onClick={() => toggleRestauranteActivo(r._id)} className={r.activo ? "text-destructive" : "text-emerald-600"}>
-                    {r.activo ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-                    {r.activo ? "Desactivar" : "Activar"}
-                  </Button>
+                  <div className="flex items-center justify-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => toggleRestauranteActivo(r._id)} className={r.activo ? "text-destructive" : "text-emerald-600"}>
+                      {r.activo ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                      {r.activo ? "Desactivar" : "Activar"}
+                    </Button>
+                    {!r.activo && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => setConfirmDeleteId(r._id)}>
+                        <Trash2 size={14} />
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <Dialog open={!!confirmDeleteId} onOpenChange={(open) => !open && setConfirmDeleteId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Eliminar restaurante</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            Se eliminará permanentemente <strong>{restaurantes.find((r) => r._id === confirmDeleteId)?.nombre}</strong> y todos sus platillos.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => { deleteRestaurante(confirmDeleteId!); setConfirmDeleteId(null) }}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
