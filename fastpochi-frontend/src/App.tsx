@@ -27,6 +27,7 @@ import PropietarioDashboard from "@/pages/propietario/PropietarioDashboard"
 import PropietarioPedidos from "@/pages/propietario/PropietarioPedidos"
 import PropietarioMenu from "@/pages/propietario/PropietarioMenu"
 import PropietarioNuevoRestaurante from "@/pages/propietario/PropietarioNuevoRestaurante"
+import PropietarioEditarRestaurante from "@/pages/propietario/PropietarioEditarRestaurante"
 
 export default function App() {
   return (
@@ -61,6 +62,7 @@ export default function App() {
                 <Route index element={<PropietarioDashboard />} />
                 <Route path="pedidos" element={<PropietarioPedidos />} />
                 <Route path="restaurante/:id/menu" element={<PropietarioMenu />} />
+                <Route path="restaurante/:id/editar" element={<PropietarioEditarRestaurante />} />
                 <Route path="nuevo-restaurante" element={<PropietarioNuevoRestaurante />} />
               </Route>
 

@@ -1,63 +1,65 @@
 import { useState, useRef } from "react"
-import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Upload, ImageIcon } from "lucide-react"
+import { useParams, useNavigate } from "react-router-dom"
+import { ArrowLeft, Upload, ImageIcon, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { PreferenceTags } from "@/components/fastpochi/preference-tags"
+import { StatusBadge } from "@/components/fastpochi/status-badge"
 import { RESTAURANT_CATEGORIES } from "@/lib/mock-data"
 import type { HorarioDia } from "@/lib/mock-data"
 import { useAuth, useData } from "@/lib/store"
 
 const DIAS: { key: string; label: string }[] = [
-  { key: "lunes", label: "Lunes" },
-  { key: "martes", label: "Martes" },
-  { key: "miercoles", label: "Miércoles" },
-  { key: "jueves", label: "Jueves" },
-  { key: "viernes", label: "Viernes" },
-  { key: "sabado", label: "Sábado" },
-  { key: "domingo", label: "Domingo" },
+  { key: "lunes",     label: "Lunes"      },
+  { key: "martes",    label: "Martes"     },
+  { key: "miercoles", label: "Miércoles"  },
+  { key: "jueves",    label: "Jueves"     },
+  { key: "viernes",   label: "Viernes"    },
+  { key: "sabado",    label: "Sábado"     },
+  { key: "domingo",   label: "Domingo"    },
 ]
 
-const DEFAULT_HORARIO: Record<string, HorarioDia> = {
-  lunes:     { abre: "08:00", cierra: "22:00", cerrado: false },
-  martes:    { abre: "08:00", cierra: "22:00", cerrado: false },
-  miercoles: { abre: "08:00", cierra: "22:00", cerrado: false },
-  jueves:    { abre: "08:00", cierra: "22:00", cerrado: false },
-  viernes:   { abre: "08:00", cierra: "23:00", cerrado: false },
-  sabado:    { abre: "09:00", cierra: "23:00", cerrado: false },
-  domingo:   { abre: "09:00", cierra: "20:00", cerrado: false },
-}
-
-export default function PropietarioNuevoRestaurante() {
+export default function PropietarioEditarRestaurante() {
+  const { id: restId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { addRestaurante } = useData()
+  const { restaurantes, updateRestaurante, deleteRestaurante, toggleRestauranteActivo } = useData()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [nombre, setNombre] = useState("")
-  const [descripcion, setDescripcion] = useState("")
-  const [calle, setCalle] = useState("")
-  const [ciudad, setCiudad] = useState("Guatemala")
-  const [pais, setPais] = useState("GT")
-  const [codigoPostal, setCodigoPostal] = useState("")
-  const [telefono, setTelefono] = useState("")
-  const [categorias, setCategorias] = useState<string[]>([])
-  const [horario, setHorario] = useState<Record<string, HorarioDia>>(DEFAULT_HORARIO)
-  const [lat, setLat] = useState("14.6349")
-  const [lng, setLng] = useState("-90.5069")
-  // Mock GridFS: store preview URL (real backend would POST file → get ObjectId)
-  const [imgPreview, setImgPreview] = useState<string>(
-    "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=400&fit=crop"
-  )
+  const restaurant = restaurantes.find((r) => r._id === restId)
+
+  const [nombre, setNombre] = useState(restaurant?.nombre || "")
+  const [descripcion, setDescripcion] = useState(restaurant?.descripcion || "")
+  const [calle, setCalle] = useState(restaurant?.direccion.calle || "")
+  const [ciudad, setCiudad] = useState(restaurant?.direccion.ciudad || "")
+  const [pais, setPais] = useState(restaurant?.direccion.pais || "GT")
+  const [codigoPostal, setCodigoPostal] = useState(restaurant?.direccion.codigo_postal || "")
+  const [telefono, setTelefono] = useState(restaurant?.telefono || "")
+  const [categorias, setCategorias] = useState<string[]>(restaurant?.categorias || [])
+  const [horario, setHorario] = useState<Record<string, HorarioDia>>(restaurant?.horario || {})
+  const [lat, setLat] = useState(String(restaurant?.ubicacion.coordinates[1] || "14.6349"))
+  const [lng, setLng] = useState(String(restaurant?.ubicacion.coordinates[0] || "-90.5069"))
+  const [imgPreview, setImgPreview] = useState<string>(restaurant?.img_portada || "")
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+
+  if (!restaurant || restaurant.propietario_id !== user?._id) {
+    return (
+      <div className="py-12 text-center">
+        <p className="text-muted-foreground">Restaurante no encontrado</p>
+        <Button variant="ghost" className="mt-2" onClick={() => navigate("/propietario")}>Volver</Button>
+      </div>
+    )
+  }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    // Simulate GridFS upload — real backend: POST /api/gridfs/upload → returns img_portada_id
+    // Mock GridFS upload — real backend: POST /api/gridfs/upload → returns img_portada_id
     const previewUrl = URL.createObjectURL(file)
     setImgPreview(previewUrl)
   }
@@ -68,9 +70,8 @@ export default function PropietarioNuevoRestaurante() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user || categorias.length === 0) return
-    addRestaurante({
-      propietario_id: user._id,
+    if (categorias.length === 0) return
+    updateRestaurante(restId!, {
       nombre,
       descripcion,
       ubicacion: { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] },
@@ -83,13 +84,46 @@ export default function PropietarioNuevoRestaurante() {
     navigate("/propietario")
   }
 
+  const handleDelete = () => {
+    deleteRestaurante(restId!)
+    navigate("/propietario")
+  }
+
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-6 flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/propietario")}>
-          <ArrowLeft size={20} />
-        </Button>
-        <h1 className="text-2xl font-bold text-foreground">Agregar Restaurante</h1>
+      <div className="mb-6 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/propietario")}>
+            <ArrowLeft size={20} />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Editar Restaurante</h1>
+            <div className="flex items-center gap-2 mt-0.5">
+              <StatusBadge status={restaurant.activo ? "activo" : "inactivo"} />
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={restaurant.activo ? "destructive" : "default"}
+            size="sm"
+            onClick={() => toggleRestauranteActivo(restId!)}
+          >
+            {restaurant.activo ? "Desactivar" : "Activar"}
+          </Button>
+          {!restaurant.activo && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 size={14} /> Eliminar
+            </Button>
+          )}
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -105,7 +139,7 @@ export default function PropietarioNuevoRestaurante() {
             </div>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
             <Button type="button" variant="outline" size="sm" className="gap-2 self-start" onClick={() => fileInputRef.current?.click()}>
-              <Upload size={14} /> Subir imagen
+              <Upload size={14} /> Cambiar imagen
             </Button>
             <p className="text-xs text-muted-foreground">En el backend este archivo se guardará en GridFS y se almacenará el ObjectId en img_portada_id.</p>
           </CardContent>
@@ -117,19 +151,18 @@ export default function PropietarioNuevoRestaurante() {
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="nombre">Nombre del restaurante</Label>
-              <Input id="nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Mi Restaurante" required />
+              <Input id="nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="desc">Descripción</Label>
-              <Textarea id="desc" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Describe tu restaurante..." rows={3} required />
+              <Textarea id="desc" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={3} required />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="tel">Teléfono</Label>
-              <Input id="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="+502 1234 5678" />
+              <Input id="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Categorías</Label>
-              <p className="text-xs text-muted-foreground">Selecciona al menos una</p>
               <PreferenceTags
                 tags={RESTAURANT_CATEGORIES}
                 selected={categorias}
@@ -145,7 +178,7 @@ export default function PropietarioNuevoRestaurante() {
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="calle">Dirección</Label>
-              <Input id="calle" value={calle} onChange={(e) => setCalle(e.target.value)} placeholder="5a Avenida 11-59, Zona 1" required />
+              <Input id="calle" value={calle} onChange={(e) => setCalle(e.target.value)} required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
@@ -154,21 +187,21 @@ export default function PropietarioNuevoRestaurante() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="pais">País</Label>
-                <Input id="pais" value={pais} onChange={(e) => setPais(e.target.value)} placeholder="GT" />
+                <Input id="pais" value={pais} onChange={(e) => setPais(e.target.value)} />
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="cp">Código Postal</Label>
-              <Input id="cp" value={codigoPostal} onChange={(e) => setCodigoPostal(e.target.value)} placeholder="01010" />
+              <Input id="cp" value={codigoPostal} onChange={(e) => setCodigoPostal(e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="lat">Latitud (GeoJSON)</Label>
-                <Input id="lat" value={lat} onChange={(e) => setLat(e.target.value)} placeholder="14.6349" />
+                <Input id="lat" value={lat} onChange={(e) => setLat(e.target.value)} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="lng">Longitud (GeoJSON)</Label>
-                <Input id="lng" value={lng} onChange={(e) => setLng(e.target.value)} placeholder="-90.5069" />
+                <Input id="lng" value={lng} onChange={(e) => setLng(e.target.value)} />
               </div>
             </div>
           </CardContent>
@@ -180,7 +213,7 @@ export default function PropietarioNuevoRestaurante() {
           <CardContent>
             <div className="flex flex-col gap-3">
               {DIAS.map(({ key, label }) => {
-                const dia = horario[key]
+                const dia = horario[key] || { abre: "08:00", cierra: "22:00", cerrado: false }
                 return (
                   <div key={key} className="grid grid-cols-[100px_1fr_1fr_auto] items-center gap-3">
                     <span className="text-sm font-medium text-foreground">{label}</span>
@@ -219,9 +252,25 @@ export default function PropietarioNuevoRestaurante() {
         </Card>
 
         <Button type="submit" className="w-full" disabled={categorias.length === 0}>
-          Crear Restaurante
+          Guardar Cambios
         </Button>
       </form>
+
+      {/* Delete confirmation */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Eliminar restaurante</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            Esta acción eliminará permanentemente <strong>{restaurant.nombre}</strong> y todos sus platillos. Solo se puede eliminar restaurantes inactivos.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDelete}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

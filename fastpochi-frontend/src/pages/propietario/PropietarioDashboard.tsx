@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom"
-import { Plus, ShoppingBag } from "lucide-react"
+import { Plus, ShoppingBag, Pencil, UtensilsCrossed } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { RestaurantCard } from "@/components/fastpochi/restaurant-card"
+import { Badge } from "@/components/ui/badge"
+import { StarRating } from "@/components/fastpochi/star-rating"
 import { useAuth, useData } from "@/lib/store"
 
 export default function PropietarioDashboard() {
@@ -26,10 +27,10 @@ export default function PropietarioDashboard() {
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: "Pedidos Hoy", value: todayOrders.length, color: "bg-primary/10", iconColor: "text-primary" },
+          { label: "Pedidos Hoy",      value: todayOrders.length,         color: "bg-primary/10",       iconColor: "text-primary" },
           { label: "Ingresos Totales", value: `Q${totalRevenue.toFixed(2)}`, color: "bg-emerald-500/10", iconColor: "text-emerald-500" },
-          { label: "Total Pedidos", value: myOrders.length, color: "bg-secondary", iconColor: "text-secondary-foreground" },
-          { label: "Restaurantes", value: myRestaurantes.length, color: "bg-accent/10", iconColor: "text-accent" },
+          { label: "Total Pedidos",    value: myOrders.length,             color: "bg-secondary",        iconColor: "text-secondary-foreground" },
+          { label: "Restaurantes",     value: myRestaurantes.length,       color: "bg-accent/10",        iconColor: "text-accent" },
         ].map((stat) => (
           <Card key={stat.label} className="border-0 shadow-sm">
             <CardContent className="flex items-center gap-3 p-4">
@@ -55,9 +56,44 @@ export default function PropietarioDashboard() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {myRestaurantes.map((r) => (
-            <Link key={r._id} to={`/propietario/restaurante/${r._id}/menu`}>
-              <RestaurantCard restaurant={r} />
-            </Link>
+            <Card key={r._id} className="group overflow-hidden border-0 shadow-sm transition-all hover:shadow-lg">
+              <div className="relative h-40 w-full overflow-hidden">
+                <img
+                  src={r.img_portada}
+                  alt={r.nombre}
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                {!r.activo && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <Badge variant="destructive">Inactivo</Badge>
+                  </div>
+                )}
+              </div>
+              <CardContent className="p-4">
+                <h3 className="font-semibold text-foreground">{r.nombre}</h3>
+                <div className="mt-1 flex items-center gap-2">
+                  <StarRating value={r.calificacion_prom} size={13} readOnly />
+                  <span className="text-xs text-muted-foreground">{r.calificacion_prom.toFixed(1)} ({r.total_resenas})</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {r.categorias.map((cat) => (
+                    <Badge key={cat} variant="secondary" className="text-xs capitalize">{cat}</Badge>
+                  ))}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <Button asChild size="sm" className="flex-1 gap-1.5">
+                    <Link to={`/propietario/restaurante/${r._id}/menu`}>
+                      <UtensilsCrossed size={14} /> Menú
+                    </Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline" className="gap-1.5">
+                    <Link to={`/propietario/restaurante/${r._id}/editar`}>
+                      <Pencil size={14} /> Editar
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}

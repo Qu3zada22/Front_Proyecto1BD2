@@ -97,13 +97,17 @@ interface DataContextType {
 
   // Restaurant CRUD
   addRestaurante: (r: Omit<Restaurante, "_id" | "fecha_creacion" | "calificacion_prom" | "total_resenas" | "activo">) => void
+  updateRestaurante: (id: string, data: Partial<Restaurante>) => void
+  deleteRestaurante: (id: string) => void
   toggleRestauranteActivo: (id: string) => void
 
   // Menu CRUD
   addMenuItem: (item: Omit<MenuItem, "_id" | "fecha_creacion" | "veces_ordenado">) => void
   updateMenuItem: (id: string, data: Partial<MenuItem>) => void
   deleteMenuItem: (id: string) => void
+  deleteMenuItems: (ids: string[]) => void
   toggleMenuItemDisponible: (id: string) => void
+  setMenuItemsDisponible: (ids: string[], disponible: boolean) => void
 
   // Orders
   createOrder: (order: Omit<Orden, "_id" | "fecha_creacion" | "historial_estados" | "tiene_resena" | "estado">) => string
@@ -143,6 +147,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
       fecha_creacion: new Date().toISOString(),
     }
     setRestaurantes((prev) => [...prev, newR])
+  }, [])
+
+  const updateRestaurante = useCallback((id: string, data: Partial<Restaurante>) => {
+    setRestaurantes((prev) => prev.map((r) => r._id === id ? { ...r, ...data } : r))
+  }, [])
+
+  const deleteRestaurante = useCallback((id: string) => {
+    setRestaurantes((prev) => prev.filter((r) => r._id !== id))
+    setMenuItems((prev) => prev.filter((mi) => mi.restaurante_id !== id))
   }, [])
 
   const toggleRestauranteActivo = useCallback((id: string) => {
@@ -186,8 +199,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setMenuItems((prev) => prev.filter((i) => i._id !== id))
   }, [])
 
+  const deleteMenuItems = useCallback((ids: string[]) => {
+    setMenuItems((prev) => prev.filter((i) => !ids.includes(i._id)))
+  }, [])
+
   const toggleMenuItemDisponible = useCallback((id: string) => {
     setMenuItems((prev) => prev.map((i) => i._id === id ? { ...i, disponible: !i.disponible } : i))
+  }, [])
+
+  const setMenuItemsDisponible = useCallback((ids: string[], disponible: boolean) => {
+    setMenuItems((prev) => prev.map((i) => ids.includes(i._id) ? { ...i, disponible } : i))
   }, [])
 
   // --- Orders ---
@@ -325,8 +346,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   return (
     <DataContext.Provider value={{
       restaurantes, menuItems: menuItemsList, ordenes, resenas, notifications,
-      addRestaurante, toggleRestauranteActivo,
-      addMenuItem, updateMenuItem, deleteMenuItem, toggleMenuItemDisponible,
+      addRestaurante, updateRestaurante, deleteRestaurante, toggleRestauranteActivo,
+      addMenuItem, updateMenuItem, deleteMenuItem, deleteMenuItems, toggleMenuItemDisponible, setMenuItemsDisponible,
       createOrder, advanceOrderStatus, cancelOrder,
       addResena, toggleResenaActiva, toggleLikeResena, deleteResenas,
       markNotificationRead, markAllNotificationsRead,
