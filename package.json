@@ -1,0 +1,21 @@
+{
+    "name": "proyecto1-bd2",
+    "version": "1.0.0",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "dev": "turbo dev",
+        "build": "turbo build"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "packageManager": "npm@10.9.2",
+    "workspaces": [
+        "apps/*"
+    ],
+    "devDependencies": {
+        "turbo": "^2.8.14"
+    }
+}
