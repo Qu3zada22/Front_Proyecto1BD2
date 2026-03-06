@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { EstadoOrden, Rol } from "@/lib/mock-data"
+import type { EstadoOrden, Rol } from "@/lib/mock-data"
 
 const STATUS_COLORS: Record<EstadoOrden, string> = {
   pendiente: "bg-amber-100 text-amber-800 border-amber-200",
