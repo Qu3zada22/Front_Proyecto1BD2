@@ -13,7 +13,10 @@ import { SeedModule } from './seed/seed.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', 'apps/api/.env'],
+    }),
 
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
