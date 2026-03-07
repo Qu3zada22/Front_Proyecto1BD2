@@ -5,9 +5,9 @@ import { ResenasController } from './resenas.controller';
 import { ResenasService } from './resenas.service';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Resena.name, schema: ResenaSchema }])],
-  controllers: [ResenasController],
-  providers: [ResenasService],
-  exports: [ResenasService],
+    imports: [MongooseModule.forFeature([{ name: Resena.name, schema: ResenaSchema }])],
+    controllers: [ResenasController],
+    providers: [ResenasService],
+    exports: [ResenasService],
 })
-export class ResenasModule {}
+export class ResenasModule { }

@@ -6,41 +6,41 @@ import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 
 @Controller('users')
 export class UsuariosController {
-  constructor(private readonly usuariosService: UsuariosService) {}
+    constructor(private readonly usuariosService: UsuariosService) { }
 
-  @Post()
-  create(@Body() dto: CreateUsuarioDto) {
-    return this.usuariosService.create(dto);
-  }
+    @Post()
+    create(@Body() dto: CreateUsuarioDto) {
+        return this.usuariosService.create(dto);
+    }
 
-  @Get(':id')
-  findOne(@Param('id', ParseMongoIdPipe) id: string) {
-    return this.usuariosService.findOne(id);
-  }
+    @Get(':id')
+    findOne(@Param('id', ParseMongoIdPipe) id: string) {
+        return this.usuariosService.findOne(id);
+    }
 
-  @Patch(':id')
-  update(@Param('id', ParseMongoIdPipe) id: string, @Body() dto: UpdateUsuarioDto) {
-    return this.usuariosService.update(id, dto);
-  }
+    @Patch(':id')
+    update(@Param('id', ParseMongoIdPipe) id: string, @Body() dto: UpdateUsuarioDto) {
+        return this.usuariosService.update(id, dto);
+    }
 
-  @Delete(':id')
-  remove(@Param('id', ParseMongoIdPipe) id: string) {
-    return this.usuariosService.remove(id);
-  }
+    @Delete(':id')
+    remove(@Param('id', ParseMongoIdPipe) id: string) {
+        return this.usuariosService.remove(id);
+    }
 
-  @Post(':id/addresses')
-  addAddress(
-    @Param('id', ParseMongoIdPipe) id: string,
-    @Body() dto: DireccionUsuarioDto,
-  ) {
-    return this.usuariosService.addAddress(id, dto);
-  }
+    @Post(':id/addresses')
+    addAddress(
+        @Param('id', ParseMongoIdPipe) id: string,
+        @Body() dto: DireccionUsuarioDto,
+    ) {
+        return this.usuariosService.addAddress(id, dto);
+    }
 
-  @Delete(':id/addresses/:alias')
-  removeAddress(
-    @Param('id', ParseMongoIdPipe) id: string,
-    @Param('alias') alias: string,
-  ) {
-    return this.usuariosService.removeAddress(id, alias);
-  }
+    @Delete(':id/addresses/:alias')
+    removeAddress(
+        @Param('id', ParseMongoIdPipe) id: string,
+        @Param('alias') alias: string,
+    ) {
+        return this.usuariosService.removeAddress(id, alias);
+    }
 }

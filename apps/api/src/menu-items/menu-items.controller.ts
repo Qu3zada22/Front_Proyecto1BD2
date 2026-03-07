@@ -7,55 +7,55 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Controller('menu-items')
 export class MenuItemsController {
-  constructor(private readonly menuItemsService: MenuItemsService) {}
+    constructor(private readonly menuItemsService: MenuItemsService) { }
 
-  @Post()
-  create(@Body() dto: CreateMenuItemDto) {
-    return this.menuItemsService.create(dto);
-  }
+    @Post()
+    create(@Body() dto: CreateMenuItemDto) {
+        return this.menuItemsService.create(dto);
+    }
 
-  @Get()
-  findAll(@Query() query: PaginationDto & { restaurante_id?: string; categoria?: string; etiqueta?: string }) {
-    return this.menuItemsService.findAll(query);
-  }
+    @Get()
+    findAll(@Query() query: PaginationDto & { restaurante_id?: string; categoria?: string; etiqueta?: string }) {
+        return this.menuItemsService.findAll(query);
+    }
 
-  @Get(':id')
-  findOne(@Param('id', ParseMongoIdPipe) id: string) {
-    return this.menuItemsService.findOne(id);
-  }
+    @Get(':id')
+    findOne(@Param('id', ParseMongoIdPipe) id: string) {
+        return this.menuItemsService.findOne(id);
+    }
 
-  @Patch(':id')
-  update(@Param('id', ParseMongoIdPipe) id: string, @Body() dto: UpdateMenuItemDto) {
-    return this.menuItemsService.update(id, dto);
-  }
+    @Patch(':id')
+    update(@Param('id', ParseMongoIdPipe) id: string, @Body() dto: UpdateMenuItemDto) {
+        return this.menuItemsService.update(id, dto);
+    }
 
-  // Actualizar disponibilidad de todos los items de un restaurante
-  @Patch('restaurant/:restauranteId/availability')
-  updateMany(
-    @Param('restauranteId', ParseMongoIdPipe) restauranteId: string,
-    @Body() dto: UpdateMenuItemDto,
-  ) {
-    return this.menuItemsService.updateMany(restauranteId, dto);
-  }
+    // Actualizar disponibilidad de todos los items de un restaurante
+    @Patch('restaurant/:restauranteId/availability')
+    updateMany(
+        @Param('restauranteId', ParseMongoIdPipe) restauranteId: string,
+        @Body() dto: UpdateMenuItemDto,
+    ) {
+        return this.menuItemsService.updateMany(restauranteId, dto);
+    }
 
-  @Delete(':id')
-  remove(@Param('id', ParseMongoIdPipe) id: string) {
-    return this.menuItemsService.remove(id);
-  }
+    @Delete(':id')
+    remove(@Param('id', ParseMongoIdPipe) id: string) {
+        return this.menuItemsService.remove(id);
+    }
 
-  // Eliminar todos los items de un restaurante
-  @Delete('restaurant/:restauranteId')
-  removeByRestaurant(@Param('restauranteId', ParseMongoIdPipe) restauranteId: string) {
-    return this.menuItemsService.removeByRestaurant(restauranteId);
-  }
+    // Eliminar todos los items de un restaurante
+    @Delete('restaurant/:restauranteId')
+    removeByRestaurant(@Param('restauranteId', ParseMongoIdPipe) restauranteId: string) {
+        return this.menuItemsService.removeByRestaurant(restauranteId);
+    }
 
-  @Patch(':id/tags')
-  addTag(@Param('id', ParseMongoIdPipe) id: string, @Body('tag') tag: string) {
-    return this.menuItemsService.addTag(id, tag);
-  }
+    @Patch(':id/tags')
+    addTag(@Param('id', ParseMongoIdPipe) id: string, @Body('tag') tag: string) {
+        return this.menuItemsService.addTag(id, tag);
+    }
 
-  @Delete(':id/tags/:tag')
-  removeTag(@Param('id', ParseMongoIdPipe) id: string, @Param('tag') tag: string) {
-    return this.menuItemsService.removeTag(id, tag);
-  }
+    @Delete(':id/tags/:tag')
+    removeTag(@Param('id', ParseMongoIdPipe) id: string, @Param('tag') tag: string) {
+        return this.menuItemsService.removeTag(id, tag);
+    }
 }

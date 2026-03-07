@@ -3,11 +3,11 @@ import { Transform } from 'class-transformer';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class QueryRestaurantesDto extends PaginationDto {
-  @IsOptional() @IsString() categoria?: string;
-  @IsOptional() @IsString() busqueda?: string;
+    @IsOptional() @IsString() categoria?: string;
+    @IsOptional() @IsString() busqueda?: string;
 
-  @IsOptional()
-  @Transform(({ value }) => value === 'true')
-  @IsBoolean()
-  activo?: boolean;
+    @IsOptional()
+    @Transform(({ value }) => value === 'true')
+    @IsBoolean()
+    activo?: boolean;
 }

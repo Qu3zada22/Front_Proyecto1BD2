@@ -5,9 +5,9 @@ import { RestaurantesController } from './restaurantes.controller';
 import { RestaurantesService } from './restaurantes.service';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Restaurante.name, schema: RestauranteSchema }])],
-  controllers: [RestaurantesController],
-  providers: [RestaurantesService],
-  exports: [RestaurantesService],
+    imports: [MongooseModule.forFeature([{ name: Restaurante.name, schema: RestauranteSchema }])],
+    controllers: [RestaurantesController],
+    providers: [RestaurantesService],
+    exports: [RestaurantesService],
 })
-export class RestaurantesModule {}
+export class RestaurantesModule { }

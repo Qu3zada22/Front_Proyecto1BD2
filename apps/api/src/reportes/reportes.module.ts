@@ -9,16 +9,16 @@ import { Resena, ResenaSchema } from '../resenas/schemas/resena.schema';
 import { Usuario, UsuarioSchema } from '../usuarios/schemas/usuario.schema';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([
-      { name: Orden.name, schema: OrdenSchema },
-      { name: Restaurante.name, schema: RestauranteSchema },
-      { name: MenuItem.name, schema: MenuItemSchema },
-      { name: Resena.name, schema: ResenaSchema },
-      { name: Usuario.name, schema: UsuarioSchema },
-    ]),
-  ],
-  controllers: [ReportesController],
-  providers: [ReportesService],
+    imports: [
+        MongooseModule.forFeature([
+            { name: Orden.name, schema: OrdenSchema },
+            { name: Restaurante.name, schema: RestauranteSchema },
+            { name: MenuItem.name, schema: MenuItemSchema },
+            { name: Resena.name, schema: ResenaSchema },
+            { name: Usuario.name, schema: UsuarioSchema },
+        ]),
+    ],
+    controllers: [ReportesController],
+    providers: [ReportesService],
 })
-export class ReportesModule {}
+export class ReportesModule { }

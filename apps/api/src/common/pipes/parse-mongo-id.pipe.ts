@@ -3,10 +3,10 @@ import { Types } from 'mongoose';
 
 @Injectable()
 export class ParseMongoIdPipe implements PipeTransform<string, string> {
-  transform(value: string): string {
-    if (!Types.ObjectId.isValid(value)) {
-      throw new BadRequestException(`'${value}' no es un ObjectId válido`);
+    transform(value: string): string {
+        if (!Types.ObjectId.isValid(value)) {
+            throw new BadRequestException(`'${value}' no es un ObjectId válido`);
+        }
+        return value;
     }
-    return value;
-  }
 }

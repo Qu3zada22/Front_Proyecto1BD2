@@ -3,15 +3,15 @@ import { SeedService } from './seed.service';
 
 @Controller('seed')
 export class SeedController {
-  constructor(private readonly seedService: SeedService) {}
+    constructor(private readonly seedService: SeedService) { }
 
-  @Post()
-  run() {
-    return this.seedService.run();
-  }
+    @Post()
+    run() {
+        return this.seedService.run();
+    }
 
-  @Delete()
-  clear() {
-    return this.seedService.clearAll().then(() => ({ message: 'Base de datos limpiada' }));
-  }
+    @Delete()
+    clear() {
+        return this.seedService.clearAll().then(() => ({ message: 'Base de datos limpiada' }));
+    }
 }

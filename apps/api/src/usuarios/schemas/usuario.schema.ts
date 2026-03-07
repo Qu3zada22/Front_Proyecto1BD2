@@ -4,16 +4,16 @@ import { HydratedDocument } from 'mongoose';
 // ---- Embedded: Dirección ----
 @Schema({ _id: false })
 export class DireccionUsuario {
-  @Prop({ required: true }) alias: string;
-  @Prop({ required: true }) calle: string;
-  @Prop({ required: true }) ciudad: string;
-  @Prop({ required: true }) pais: string;
-  @Prop({ default: false }) es_principal: boolean;
-  @Prop({
-    type: { type: String, enum: ['Point'], default: 'Point' },
-    coordinates: { type: [Number] },
-  })
-  coords?: { type: string; coordinates: [number, number] };
+    @Prop({ required: true }) alias: string;
+    @Prop({ required: true }) calle: string;
+    @Prop({ required: true }) ciudad: string;
+    @Prop({ required: true }) pais: string;
+    @Prop({ default: false }) es_principal: boolean;
+    @Prop({
+        type: { type: String, enum: ['Point'], default: 'Point' },
+        coordinates: { type: [Number] },
+    })
+    coords?: { type: string; coordinates: [number, number] };
 }
 export const DireccionUsuarioSchema = SchemaFactory.createForClass(DireccionUsuario);
 
@@ -24,23 +24,23 @@ export type Rol = 'cliente' | 'propietario' | 'admin';
 
 @Schema({ timestamps: true, collection: 'usuarios' })
 export class Usuario {
-  @Prop({ required: true }) nombre: string;
+    @Prop({ required: true }) nombre: string;
 
-  @Prop({ required: true }) email: string;
+    @Prop({ required: true }) email: string;
 
-  @Prop({ required: true }) password: string;
+    @Prop({ required: true }) password: string;
 
-  @Prop() telefono?: string;
+    @Prop() telefono?: string;
 
-  @Prop({ type: String, enum: ['cliente', 'propietario', 'admin'], default: 'cliente' })
-  rol: Rol;
+    @Prop({ type: String, enum: ['cliente', 'propietario', 'admin'], default: 'cliente' })
+    rol: Rol;
 
-  @Prop({ default: true }) activo: boolean;
+    @Prop({ default: true }) activo: boolean;
 
-  @Prop({ type: [String], default: [] }) preferencias: string[];
+    @Prop({ type: [String], default: [] }) preferencias: string[];
 
-  @Prop({ type: [DireccionUsuarioSchema], default: [] })
-  direcciones: DireccionUsuario[];
+    @Prop({ type: [DireccionUsuarioSchema], default: [] })
+    direcciones: DireccionUsuario[];
 }
 
 export const UsuarioSchema = SchemaFactory.createForClass(Usuario);

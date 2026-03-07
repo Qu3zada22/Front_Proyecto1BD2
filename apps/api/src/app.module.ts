@@ -12,28 +12,28 @@ import { FilesModule } from './files/files.module';
 import { SeedModule } from './seed/seed.module';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: ['.env', 'apps/api/.env'],
-    }),
+    imports: [
+        ConfigModule.forRoot({
+            isGlobal: true,
+            envFilePath: ['.env', 'apps/api/.env'],
+        }),
 
-    MongooseModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        uri: config.get<string>('MONGODB_URI'),
-      }),
-      inject: [ConfigService],
-    }),
+        MongooseModule.forRootAsync({
+            imports: [ConfigModule],
+            useFactory: (config: ConfigService) => ({
+                uri: config.get<string>('MONGODB_URI'),
+            }),
+            inject: [ConfigService],
+        }),
 
-    UsuariosModule,
-    RestaurantesModule,
-    MenuItemsModule,
-    OrdenesModule,
-    ResenasModule,
-    ReportesModule,
-    FilesModule,
-    SeedModule,
-  ],
+        UsuariosModule,
+        RestaurantesModule,
+        MenuItemsModule,
+        OrdenesModule,
+        ResenasModule,
+        ReportesModule,
+        FilesModule,
+        SeedModule,
+    ],
 })
-export class AppModule {}
+export class AppModule { }
