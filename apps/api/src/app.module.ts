@@ -7,13 +7,14 @@ import { RestaurantesModule } from './restaurantes/restaurantes.module';
 import { MenuItemsModule } from './menu-items/menu-items.module';
 import { OrdenesModule } from './ordenes/ordenes.module';
 import { ResenasModule } from './resenas/resenas.module';
+import { ReportesModule } from './reportes/reportes.module';
+import { FilesModule } from './files/files.module';
+import { SeedModule } from './seed/seed.module';
 
 @Module({
   imports: [
-    // Carga variables de entorno desde .env
     ConfigModule.forRoot({ isGlobal: true }),
 
-    // Conexión a MongoDB — URI desde variable de entorno
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
@@ -27,6 +28,9 @@ import { ResenasModule } from './resenas/resenas.module';
     MenuItemsModule,
     OrdenesModule,
     ResenasModule,
+    ReportesModule,
+    FilesModule,
+    SeedModule,
   ],
 })
 export class AppModule {}

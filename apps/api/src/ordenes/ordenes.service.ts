@@ -1,8 +1,12 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { InjectConnection } from '@nestjs/mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Connection, Model } from 'mongoose';
 import { Orden, OrdenDocument, EstadoOrden } from './schemas/orden.schema';
+import { CreateOrdenDto } from './dto/create-orden.dto';
+
+const ESTADOS_VALIDOS: EstadoOrden[] = [
+  'pendiente', 'confirmado', 'en_camino', 'entregado', 'cancelado',
+];
 
 @Injectable()
 export class OrdenesService {
@@ -11,17 +15,18 @@ export class OrdenesService {
     @InjectConnection() private connection: Connection,
   ) {}
 
-  // Crea la orden dentro de una transacción MongoDB
-  async create(data: Partial<Orden>): Promise<OrdenDocument> {
+  // Transacción MongoDB — requiere replica set
+  async create(dto: CreateOrdenDto): Promise<OrdenDocument> {
+    const total = dto.items.reduce((sum, i) => sum + i.precio * i.cantidad, 0);
     const session = await this.connection.startSession();
     session.startTransaction();
     try {
-      const [orden] = await this.ordenModel.create([data], { session });
+      const [orden] = await this.ordenModel.create([{ ...dto, total }] as any[], { session });
       await session.commitTransaction();
       return orden;
     } catch (err) {
       await session.abortTransaction();
-      throw new BadRequestException('Error al crear la orden: ' + err.message);
+      throw new BadRequestException('Error al crear la orden: ' + (err as Error).message);
     } finally {
       await session.endSession();
     }
@@ -31,9 +36,8 @@ export class OrdenesService {
     cliente_id?: string;
     restaurante_id?: string;
     estado?: string;
-    sort?: string;
-    skip?: string;
-    limit?: string;
+    skip?: number;
+    limit?: number;
   }): Promise<any[]> {
     const filter: any = {};
     if (query.cliente_id) filter.cliente_id = query.cliente_id;
@@ -45,8 +49,8 @@ export class OrdenesService {
       .populate('cliente_id', 'nombre email')
       .populate('restaurante_id', 'nombre direccion')
       .sort({ createdAt: -1 })
-      .skip(parseInt(query.skip ?? '0'))
-      .limit(parseInt(query.limit ?? '20'))
+      .skip(query.skip ?? 0)
+      .limit(query.limit ?? 20)
       .lean()
       .exec();
   }
@@ -63,11 +67,8 @@ export class OrdenesService {
   }
 
   async updateStatus(id: string, estado: string): Promise<OrdenDocument> {
-    const estadosValidos: EstadoOrden[] = [
-      'pendiente', 'confirmado', 'en_camino', 'entregado', 'cancelado',
-    ];
-    if (!estadosValidos.includes(estado as EstadoOrden)) {
-      throw new BadRequestException('Estado inválido');
+    if (!ESTADOS_VALIDOS.includes(estado as EstadoOrden)) {
+      throw new BadRequestException(`Estado inválido. Válidos: ${ESTADOS_VALIDOS.join(', ')}`);
     }
     const updated = await this.ordenModel
       .findByIdAndUpdate(id, { $set: { estado } }, { new: true })
@@ -80,5 +81,10 @@ export class OrdenesService {
     const result = await this.ordenModel.findByIdAndDelete(id).exec();
     if (!result) throw new NotFoundException('Orden no encontrada');
     return { deleted: true };
+  }
+
+  async removeMany(ids: string[]): Promise<{ deleted: number }> {
+    const result = await this.ordenModel.deleteMany({ _id: { $in: ids } }).exec();
+    return { deleted: result.deletedCount };
   }
 }

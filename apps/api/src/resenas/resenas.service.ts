@@ -7,7 +7,7 @@ import { Resena, ResenaDocument } from './schemas/resena.schema';
 export class ResenasService {
   constructor(@InjectModel(Resena.name) private resenaModel: Model<ResenaDocument>) {}
 
-  async create(data: Partial<Resena>): Promise<ResenaDocument> {
+  async create(data: any): Promise<ResenaDocument> {
     return this.resenaModel.create(data);
   }
 

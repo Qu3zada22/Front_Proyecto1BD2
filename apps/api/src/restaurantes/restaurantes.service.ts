@@ -9,27 +9,29 @@ export class RestaurantesService {
     @InjectModel(Restaurante.name) private restauranteModel: Model<RestauranteDocument>,
   ) {}
 
-  async create(data: Partial<Restaurante>): Promise<RestauranteDocument> {
+  async create(data: any): Promise<RestauranteDocument> {
     return this.restauranteModel.create(data);
   }
 
   async findAll(query: {
     categoria?: string;
     busqueda?: string;
-    activo?: string;
+    activo?: boolean | string;
     sort?: string;
-    skip?: string;
-    limit?: string;
+    skip?: number;
+    limit?: number;
   }): Promise<RestauranteDocument[]> {
     const filter: any = {};
 
-    if (query.activo !== undefined) filter.activo = query.activo === 'true';
+    if (query.activo !== undefined) {
+      filter.activo = query.activo === 'true' || query.activo === true;
+    }
     if (query.categoria) filter.categorias = query.categoria;
     if (query.busqueda) filter.$text = { $search: query.busqueda };
 
     const sort: any = query.sort ? { [query.sort]: 1 } : { nombre: 1 };
-    const skip = parseInt(query.skip ?? '0');
-    const limit = parseInt(query.limit ?? '20');
+    const skip = Number(query.skip ?? 0);
+    const limit = Number(query.limit ?? 20);
 
     return this.restauranteModel
       .find(filter)
@@ -63,7 +65,7 @@ export class RestaurantesService {
     return restaurante;
   }
 
-  async update(id: string, data: Partial<Restaurante>): Promise<RestauranteDocument> {
+  async update(id: string, data: any): Promise<RestauranteDocument> {
     const updated = await this.restauranteModel
       .findByIdAndUpdate(id, { $set: data }, { new: true })
       .exec();

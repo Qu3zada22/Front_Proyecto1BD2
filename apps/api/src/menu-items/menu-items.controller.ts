@@ -1,42 +1,61 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { MenuItemsService } from './menu-items.service';
+import { CreateMenuItemDto } from './dto/create-menu-item.dto';
+import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
+import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Controller('menu-items')
 export class MenuItemsController {
   constructor(private readonly menuItemsService: MenuItemsService) {}
 
   @Post()
-  create(@Body() body: any) {
-    return this.menuItemsService.create(body);
+  create(@Body() dto: CreateMenuItemDto) {
+    return this.menuItemsService.create(dto);
   }
 
   @Get()
-  findAll(@Query() query: any) {
+  findAll(@Query() query: PaginationDto & { restaurante_id?: string; categoria?: string; etiqueta?: string }) {
     return this.menuItemsService.findAll(query);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseMongoIdPipe) id: string) {
     return this.menuItemsService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.menuItemsService.update(id, body);
+  update(@Param('id', ParseMongoIdPipe) id: string, @Body() dto: UpdateMenuItemDto) {
+    return this.menuItemsService.update(id, dto);
   }
 
-  @Patch()
-  updateMany(@Query('restaurante_id') restauranteId: string, @Body() body: any) {
-    return this.menuItemsService.updateMany(restauranteId, body);
+  // Actualizar disponibilidad de todos los items de un restaurante
+  @Patch('restaurant/:restauranteId/availability')
+  updateMany(
+    @Param('restauranteId', ParseMongoIdPipe) restauranteId: string,
+    @Body() dto: UpdateMenuItemDto,
+  ) {
+    return this.menuItemsService.updateMany(restauranteId, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  remove(@Param('id', ParseMongoIdPipe) id: string) {
     return this.menuItemsService.remove(id);
   }
 
+  // Eliminar todos los items de un restaurante
+  @Delete('restaurant/:restauranteId')
+  removeByRestaurant(@Param('restauranteId', ParseMongoIdPipe) restauranteId: string) {
+    return this.menuItemsService.removeByRestaurant(restauranteId);
+  }
+
   @Patch(':id/tags')
-  addTag(@Param('id') id: string, @Body('tag') tag: string) {
+  addTag(@Param('id', ParseMongoIdPipe) id: string, @Body('tag') tag: string) {
     return this.menuItemsService.addTag(id, tag);
+  }
+
+  @Delete(':id/tags/:tag')
+  removeTag(@Param('id', ParseMongoIdPipe) id: string, @Param('tag') tag: string) {
+    return this.menuItemsService.removeTag(id, tag);
   }
 }

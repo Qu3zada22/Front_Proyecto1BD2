@@ -1,18 +1,20 @@
 import { Controller, Get, Post, Delete, Param, Body, Query } from '@nestjs/common';
 import { ResenasService } from './resenas.service';
+import { CreateResenaDto } from './dto/create-resena.dto';
+import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 
 @Controller('reviews')
 export class ResenasController {
   constructor(private readonly resenasService: ResenasService) {}
 
   @Post()
-  create(@Body() body: any) {
-    return this.resenasService.create(body);
+  create(@Body() dto: CreateResenaDto) {
+    return this.resenasService.create(dto);
   }
 
   @Get('restaurant/:id')
   findByRestaurant(
-    @Param('id') id: string,
+    @Param('id', ParseMongoIdPipe) id: string,
     @Query('sort') sort: string,
     @Query('skip') skip: string,
     @Query('limit') limit: string,
@@ -21,7 +23,7 @@ export class ResenasController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  remove(@Param('id', ParseMongoIdPipe) id: string) {
     return this.resenasService.remove(id);
   }
 }

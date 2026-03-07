@@ -1,37 +1,46 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
+import { CreateUsuarioDto, DireccionUsuarioDto } from './dto/create-usuario.dto';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 
 @Controller('users')
 export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
 
   @Post()
-  create(@Body() body: any) {
-    return this.usuariosService.create(body);
+  create(@Body() dto: CreateUsuarioDto) {
+    return this.usuariosService.create(dto);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseMongoIdPipe) id: string) {
     return this.usuariosService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.usuariosService.update(id, body);
+  update(@Param('id', ParseMongoIdPipe) id: string, @Body() dto: UpdateUsuarioDto) {
+    return this.usuariosService.update(id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  remove(@Param('id', ParseMongoIdPipe) id: string) {
     return this.usuariosService.remove(id);
   }
 
   @Post(':id/addresses')
-  addAddress(@Param('id') id: string, @Body() address: any) {
-    return this.usuariosService.addAddress(id, address);
+  addAddress(
+    @Param('id', ParseMongoIdPipe) id: string,
+    @Body() dto: DireccionUsuarioDto,
+  ) {
+    return this.usuariosService.addAddress(id, dto);
   }
 
   @Delete(':id/addresses/:alias')
-  removeAddress(@Param('id') id: string, @Param('alias') alias: string) {
+  removeAddress(
+    @Param('id', ParseMongoIdPipe) id: string,
+    @Param('alias') alias: string,
+  ) {
     return this.usuariosService.removeAddress(id, alias);
   }
 }

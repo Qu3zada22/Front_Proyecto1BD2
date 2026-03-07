@@ -7,7 +7,7 @@ import { Usuario, UsuarioDocument } from './schemas/usuario.schema';
 export class UsuariosService {
   constructor(@InjectModel(Usuario.name) private usuarioModel: Model<UsuarioDocument>) {}
 
-  async create(data: Partial<Usuario>): Promise<UsuarioDocument> {
+  async create(data: any): Promise<UsuarioDocument> {
     return this.usuarioModel.create(data);
   }
 
@@ -21,7 +21,7 @@ export class UsuariosService {
     return usuario as UsuarioDocument;
   }
 
-  async update(id: string, data: Partial<Usuario>): Promise<UsuarioDocument> {
+  async update(id: string, data: any): Promise<UsuarioDocument> {
     const updated = await this.usuarioModel
       .findByIdAndUpdate(id, { $set: data }, { new: true })
       .select('-password')

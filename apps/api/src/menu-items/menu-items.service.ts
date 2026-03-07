@@ -2,34 +2,34 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { MenuItem, MenuItemDocument } from './schemas/menu-item.schema';
+import { CreateMenuItemDto } from './dto/create-menu-item.dto';
+import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
 
 @Injectable()
 export class MenuItemsService {
   constructor(@InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>) {}
 
-  async create(data: Partial<MenuItem>): Promise<MenuItemDocument> {
-    return this.menuItemModel.create(data);
+  async create(dto: CreateMenuItemDto): Promise<MenuItemDocument> {
+    return this.menuItemModel.create(dto);
   }
 
   async findAll(query: {
     restaurante_id?: string;
     categoria?: string;
     etiqueta?: string;
-    disponible?: string;
-    skip?: string;
-    limit?: string;
+    skip?: number;
+    limit?: number;
   }): Promise<MenuItemDocument[]> {
     const filter: any = {};
     if (query.restaurante_id) filter.restaurante_id = query.restaurante_id;
     if (query.categoria) filter.categoria = query.categoria;
     if (query.etiqueta) filter.etiquetas = query.etiqueta;
-    if (query.disponible !== undefined) filter.disponible = query.disponible === 'true';
 
     return this.menuItemModel
       .find(filter)
       .sort({ categoria: 1, nombre: 1 })
-      .skip(parseInt(query.skip ?? '0'))
-      .limit(parseInt(query.limit ?? '50'))
+      .skip(query.skip ?? 0)
+      .limit(query.limit ?? 50)
       .lean()
       .exec() as Promise<MenuItemDocument[]>;
   }
@@ -40,18 +40,20 @@ export class MenuItemsService {
     return item;
   }
 
-  async update(id: string, data: Partial<MenuItem>): Promise<MenuItemDocument> {
+  async update(id: string, dto: UpdateMenuItemDto): Promise<MenuItemDocument> {
     const updated = await this.menuItemModel
-      .findByIdAndUpdate(id, { $set: data }, { new: true })
+      .findByIdAndUpdate(id, { $set: dto }, { new: true })
       .exec();
     if (!updated) throw new NotFoundException('Item no encontrado');
     return updated;
   }
 
-  // Actualizar varios documentos a la vez
-  async updateMany(restauranteId: string, data: Partial<MenuItem>): Promise<{ modified: number }> {
+  async updateMany(
+    restauranteId: string,
+    dto: UpdateMenuItemDto,
+  ): Promise<{ modified: number }> {
     const result = await this.menuItemModel
-      .updateMany({ restaurante_id: restauranteId }, { $set: data })
+      .updateMany({ restaurante_id: restauranteId }, { $set: dto })
       .exec();
     return { modified: result.modifiedCount };
   }
@@ -62,10 +64,26 @@ export class MenuItemsService {
     return { deleted: true };
   }
 
+  async removeByRestaurant(restauranteId: string): Promise<{ deleted: number }> {
+    const result = await this.menuItemModel
+      .deleteMany({ restaurante_id: restauranteId })
+      .exec();
+    return { deleted: result.deletedCount };
+  }
+
   // $addToSet — agregar etiqueta sin duplicados
   async addTag(id: string, tag: string): Promise<MenuItemDocument> {
     const updated = await this.menuItemModel
       .findByIdAndUpdate(id, { $addToSet: { etiquetas: tag } }, { new: true })
+      .exec();
+    if (!updated) throw new NotFoundException('Item no encontrado');
+    return updated;
+  }
+
+  // $pull — eliminar etiqueta del array
+  async removeTag(id: string, tag: string): Promise<MenuItemDocument> {
+    const updated = await this.menuItemModel
+      .findByIdAndUpdate(id, { $pull: { etiquetas: tag } }, { new: true })
       .exec();
     if (!updated) throw new NotFoundException('Item no encontrado');
     return updated;
