@@ -1,0 +1,15 @@
+{
+  "name": "database",
+  "version": "1.0.0",
+  "description": "MongoDB Atlas seed, indexes and GridFS for Proyecto1-BD2",
+  "type": "module",
+  "scripts": {
+    "ingest": "node ingest.js",
+    "verify": "node verify.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "mongodb": "^6.12.0"
+  }
+}
