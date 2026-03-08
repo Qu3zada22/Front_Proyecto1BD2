@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useParams, Link } from "react-router-dom"
 import { ArrowLeft, Plus, Minus, ShoppingCart, Clock, MapPin, ThumbsUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -20,10 +20,14 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export default function ClienteRestaurante() {
   const { id } = useParams<{ id: string }>()
-  const { restaurantes, menuItems, resenas, toggleLikeResena } = useData()
+  const { restaurantes, menuItems, resenas, loadMenuItems, toggleLikeResena } = useData()
   const { addItem, itemCount } = useCart()
   const { user } = useAuth()
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    if (id) loadMenuItems(id)
+  }, [id, loadMenuItems])
 
   const restaurant = restaurantes.find((r) => r._id === id)
   const items = menuItems.filter((mi) => mi.restaurante_id === id && mi.disponible)

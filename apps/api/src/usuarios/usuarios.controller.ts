@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
 import { CreateUsuarioDto, DireccionUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
@@ -11,6 +11,16 @@ export class UsuariosController {
     @Post()
     create(@Body() dto: CreateUsuarioDto) {
         return this.usuariosService.create(dto);
+    }
+
+    @Get()
+    findAll(@Query('rol') rol?: string, @Query('email') email?: string) {
+        return this.usuariosService.findAll({ rol, email });
+    }
+
+    @Post('login')
+    login(@Body('email') email: string) {
+        return this.usuariosService.login(email);
     }
 
     @Get(':id')

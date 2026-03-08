@@ -1,33 +1,58 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Logo } from "@/components/fastpochi/logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { useAuth } from "@/lib/store"
-import { usuarios } from "@/lib/mock-data"
+import { api } from "@/lib/api"
+
+type DemoUser = { label: string; email: string; rol: string }
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
   const [email, setEmail] = useState("")
   const [error, setError] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [demoUsers, setDemoUsers] = useState<DemoUser[]>([])
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    const ok = login(email, "")
-    if (!ok) { setError(true); return }
-    const user = usuarios.find((u) => u.email === email)
-    if (user?.rol === "admin") navigate("/admin")
-    else if (user?.rol === "propietario") navigate("/propietario")
-    else navigate("/cliente")
+  useEffect(() => {
+    api.getUsers().then((users) => {
+      const byRol = (rol: string) => users.find((u: any) => u.rol === rol)
+      const admin = byRol("admin")
+      const propietario = byRol("propietario")
+      const cliente = byRol("cliente")
+      setDemoUsers([
+        ...(cliente ? [{ label: "Cliente", email: cliente.email, rol: "cliente" }] : []),
+        ...(propietario ? [{ label: "Propietario", email: propietario.email, rol: "propietario" }] : []),
+        ...(admin ? [{ label: "Admin", email: admin.email, rol: "admin" }] : []),
+      ])
+    }).catch(() => {})
+  }, [])
+
+  const doLogin = async (emailStr: string) => {
+    setLoading(true)
+    setError(false)
+    try {
+      const ok = await login(emailStr, "")
+      if (!ok) { setError(true); return }
+      // Get user role for redirect
+      const users = await api.getUsers({ email: emailStr })
+      const rol = users[0]?.rol ?? "cliente"
+      if (rol === "admin") navigate("/admin")
+      else if (rol === "propietario") navigate("/propietario")
+      else navigate("/cliente")
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Quick login buttons for demo
-  const demoUsers = [
-    { label: "Cliente", email: usuarios.find((u) => u.rol === "cliente")?.email || "" },
-    { label: "Propietario", email: usuarios.find((u) => u.rol === "propietario")?.email || "" },
-    { label: "Admin", email: usuarios.find((u) => u.rol === "admin")?.email || "" },
-  ]
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await doLogin(email)
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -47,14 +72,8 @@ export default function LoginPage() {
                 key={u.label}
                 variant="outline"
                 className="w-full justify-start gap-2"
-                onClick={() => {
-                  const ok = login(u.email, "")
-                  if (ok) {
-                    if (u.label === "Admin") navigate("/admin")
-                    else if (u.label === "Propietario") navigate("/propietario")
-                    else navigate("/cliente")
-                  }
-                }}
+                disabled={loading}
+                onClick={() => doLogin(u.email)}
               >
                 <span className="font-medium">{u.label}</span>
                 <span className="text-xs text-muted-foreground">{u.email}</span>
@@ -63,7 +82,9 @@ export default function LoginPage() {
 
             <div className="relative my-2">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs text-muted-foreground"><span className="bg-card px-2">o ingresa tu email</span></div>
+              <div className="relative flex justify-center text-xs text-muted-foreground">
+                <span className="bg-card px-2">o ingresa tu email</span>
+              </div>
             </div>
 
             <form onSubmit={handleLogin} className="flex flex-col gap-3">
@@ -75,7 +96,9 @@ export default function LoginPage() {
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
               {error && <p className="text-xs text-destructive">Usuario no encontrado</p>}
-              <Button type="submit" className="w-full">Entrar</Button>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Entrando..." : "Entrar"}
+              </Button>
             </form>
           </CardContent>
         </Card>

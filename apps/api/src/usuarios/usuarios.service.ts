@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Usuario, UsuarioDocument } from './schemas/usuario.schema';
@@ -9,6 +9,22 @@ export class UsuariosService {
 
     async create(data: any): Promise<UsuarioDocument> {
         return this.usuarioModel.create(data);
+    }
+
+    async findAll(query: { rol?: string; email?: string } = {}): Promise<any[]> {
+        const filter: any = {};
+        if (query.rol) filter.rol = query.rol;
+        if (query.email) filter.email = new RegExp(query.email, 'i');
+        return this.usuarioModel.find(filter).select('-password').sort({ fecha_registro: -1 }).lean().exec();
+    }
+
+    async login(email: string): Promise<any> {
+        const usuario = await this.usuarioModel
+            .findOne({ email: email.toLowerCase().trim(), activo: true })
+            .lean().exec();
+        if (!usuario) throw new UnauthorizedException('Usuario no encontrado o inactivo');
+        const { password: _pw, ...safe } = usuario as any;
+        return safe;
     }
 
     async findOne(id: string): Promise<UsuarioDocument> {
