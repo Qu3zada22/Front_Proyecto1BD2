@@ -16,6 +16,15 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return json.data as T
 }
 
+// ── Helpers ─────────────────────────────────────────────────
+
+// MongoDB Decimal128 llega como { $numberDecimal: "405.00" }
+function toNum(v: any): number {
+  if (typeof v === 'number') return v
+  if (v && typeof v === 'object' && '$numberDecimal' in v) return parseFloat(v.$numberDecimal)
+  return parseFloat(v) || 0
+}
+
 // ── Normalizers ─────────────────────────────────────────────
 
 function normalizeRestaurante(r: any): any {
@@ -37,6 +46,7 @@ function normalizeMenuItem(m: any): any {
     restaurante_id: m.restaurante_id?.toString?.() ?? m.restaurante_id,
     imagen: m.imagen_id ? `/api/files/${m.imagen_id}` : (m.imagen ?? ''),
     fecha_creacion: m.createdAt ?? m.fecha_creacion ?? '',
+    precio: toNum(m.precio),
     veces_ordenado: m.veces_ordenado ?? 0,
   }
 }
@@ -61,6 +71,8 @@ function normalizeOrden(o: any): any {
     historial_estados: o.historial_estados ?? [],
     tiene_resena: o.tiene_resena ?? false,
     fecha_creacion: o.fecha_creacion ?? o.createdAt ?? '',
+    total: toNum(o.total),
+    items: (o.items ?? []).map((i: any) => ({ ...i, precio: toNum(i.precio) })),
   }
 }
 
