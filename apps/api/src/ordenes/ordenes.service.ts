@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Connection, Model } from 'mongoose';
+import { Connection, Model, Types } from 'mongoose';
 import { Orden, OrdenDocument, EstadoOrden } from './schemas/orden.schema';
 import { CreateOrdenDto } from './dto/create-orden.dto';
 
@@ -40,13 +40,13 @@ export class OrdenesService {
         limit?: number;
     }): Promise<any[]> {
         const filter: any = {};
-        if (query.cliente_id) filter.cliente_id = query.cliente_id;
-        if (query.restaurante_id) filter.restaurante_id = query.restaurante_id;
+        if (query.cliente_id) filter.usuario_id = new Types.ObjectId(query.cliente_id);
+        if (query.restaurante_id) filter.restaurante_id = new Types.ObjectId(query.restaurante_id);
         if (query.estado) filter.estado = query.estado;
 
         return this.ordenModel
             .find(filter)
-            .populate('cliente_id', 'nombre email')
+            .populate('usuario_id', 'nombre email')
             .populate('restaurante_id', 'nombre direccion')
             .sort({ createdAt: -1 })
             .skip(query.skip ?? 0)
@@ -58,7 +58,7 @@ export class OrdenesService {
     async findOne(id: string): Promise<any> {
         const orden = await this.ordenModel
             .findById(id)
-            .populate('cliente_id', 'nombre email telefono')
+            .populate('usuario_id', 'nombre email telefono')
             .populate('restaurante_id', 'nombre telefono direccion')
             .lean()
             .exec();

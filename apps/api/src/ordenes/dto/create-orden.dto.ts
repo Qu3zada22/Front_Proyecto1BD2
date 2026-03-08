@@ -24,7 +24,7 @@ class DireccionEntregaDto {
 }
 
 export class CreateOrdenDto {
-    @IsString() cliente_id: string;
+    @IsString() usuario_id: string;
     @IsString() restaurante_id: string;
 
     @IsArray()

@@ -43,20 +43,24 @@ function normalizeMenuItem(m: any): any {
 
 // API usa "confirmado", frontend usa "en_proceso"
 function normalizeOrden(o: any): any {
-  const clienteObj = o.cliente_id
-  const clienteId = typeof clienteObj === 'object' && clienteObj !== null
-    ? clienteObj._id?.toString()
-    : clienteObj?.toString()
+  // usuario_id puede estar populado como objeto {_id, nombre, email} o como string
+  const usuarioObj = o.usuario_id
+  const usuarioId = typeof usuarioObj === 'object' && usuarioObj !== null
+    ? usuarioObj._id?.toString()
+    : usuarioObj?.toString()
+  const restauranteObj = o.restaurante_id
+  const restauranteId = typeof restauranteObj === 'object' && restauranteObj !== null
+    ? restauranteObj._id?.toString()
+    : restauranteObj?.toString()
   return {
     ...o,
     _id: o._id?.toString(),
-    usuario_id: clienteId ?? '',
-    cliente_id: clienteId ?? '',
-    restaurante_id: o.restaurante_id?._id?.toString() ?? o.restaurante_id?.toString(),
+    usuario_id: usuarioId ?? '',
+    restaurante_id: restauranteId ?? '',
     estado: o.estado === 'confirmado' ? 'en_proceso' : (o.estado ?? 'pendiente'),
     historial_estados: o.historial_estados ?? [],
     tiene_resena: o.tiene_resena ?? false,
-    fecha_creacion: o.createdAt ?? o.fecha_creacion ?? '',
+    fecha_creacion: o.fecha_creacion ?? o.createdAt ?? '',
   }
 }
 
@@ -125,7 +129,7 @@ export const api = {
 
   createOrder: (data: any) => {
     const body = {
-      cliente_id: data.usuario_id ?? data.cliente_id,
+      usuario_id: data.usuario_id ?? data.cliente_id,
       restaurante_id: data.restaurante_id,
       items: (data.items ?? []).map((i: any) => ({
         menu_item_id: i.item_id ?? i.menu_item_id,

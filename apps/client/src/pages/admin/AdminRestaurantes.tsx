@@ -7,10 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { StarRating } from "@/components/fastpochi/star-rating"
 import { StatusBadge } from "@/components/fastpochi/status-badge"
 import { useData } from "@/lib/store"
-import { usuarios } from "@/lib/mock-data"
 
 export default function AdminRestaurantesPage() {
-  const { restaurantes, toggleRestauranteActivo, deleteRestaurante } = useData()
+  const { restaurantes, adminUsers, toggleRestauranteActivo, deleteRestaurante } = useData()
   const [search, setSearch] = useState("")
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
@@ -19,7 +18,7 @@ export default function AdminRestaurantesPage() {
     r.categorias.some((c) => c.toLowerCase().includes(search.toLowerCase()))
   )
 
-  const getOwnerName = (id: string) => usuarios.find((u) => u._id === id)?.nombre || "Desconocido"
+  const getOwnerName = (id: string) => adminUsers.find((u) => u._id === id)?.nombre || "Desconocido"
 
   return (
     <div>

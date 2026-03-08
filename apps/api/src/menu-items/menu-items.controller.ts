@@ -15,8 +15,13 @@ export class MenuItemsController {
     }
 
     @Get()
-    findAll(@Query() query: PaginationDto & { restaurante_id?: string; categoria?: string; etiqueta?: string }) {
-        return this.menuItemsService.findAll(query);
+    findAll(
+        @Query() pagination: PaginationDto,
+        @Query('restaurante_id') restauranteId?: string,
+        @Query('categoria') categoria?: string,
+        @Query('etiqueta') etiqueta?: string,
+    ) {
+        return this.menuItemsService.findAll({ ...pagination, restaurante_id: restauranteId, categoria, etiqueta });
     }
 
     @Get(':id')

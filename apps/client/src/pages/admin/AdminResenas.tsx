@@ -6,10 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StarRating } from "@/components/fastpochi/star-rating"
 import { useData } from "@/lib/store"
-import { usuarios } from "@/lib/mock-data"
 
 export default function AdminResenasPage() {
-  const { resenas, restaurantes, toggleResenaActiva } = useData()
+  const { resenas, restaurantes, adminUsers, toggleResenaActiva } = useData()
   const [search, setSearch] = useState("")
   const [filterActive, setFilterActive] = useState<"todas" | "activas" | "inactivas">("todas")
 
@@ -20,12 +19,11 @@ export default function AdminResenasPage() {
       return true
     })
     .filter((r) =>
-      r.titulo.toLowerCase().includes(search.toLowerCase()) ||
-      r.comentario.toLowerCase().includes(search.toLowerCase())
+      ((r as any).titulo ?? r.comentario ?? "").toLowerCase().includes(search.toLowerCase())
     )
-    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+    .sort((a, b) => new Date(b.fecha || (a as any).createdAt).getTime() - new Date(a.fecha || (a as any).createdAt).getTime())
 
-  const getUserName = (id: string) => usuarios.find((u) => u._id === id)?.nombre || "Desconocido"
+  const getUserName = (id: string) => adminUsers.find((u) => u._id === id)?.nombre || "Desconocido"
   const getRestName = (id?: string) => id ? restaurantes.find((r) => r._id === id)?.nombre || "Desconocido" : "-"
 
   return (

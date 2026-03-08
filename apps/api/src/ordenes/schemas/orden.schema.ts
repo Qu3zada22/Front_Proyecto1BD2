@@ -36,7 +36,7 @@ export type OrdenDocument = HydratedDocument<Orden>;
 @Schema({ timestamps: true, collection: 'ordenes' })
 export class Orden {
     @Prop({ type: Types.ObjectId, ref: 'Usuario', required: true })
-    cliente_id: Types.ObjectId;
+    usuario_id: Types.ObjectId;
 
     @Prop({ type: Types.ObjectId, ref: 'Restaurante', required: true })
     restaurante_id: Types.ObjectId;
@@ -65,8 +65,8 @@ export const OrdenSchema = SchemaFactory.createForClass(Orden);
 // ---- Índices ----
 // Compuesto: historial de pedidos de un cliente filtrado por estado
 OrdenSchema.index(
-    { cliente_id: 1, estado: 1, createdAt: -1 },
-    { name: 'idx_ordenes_cliente_estado_fecha' },
+    { usuario_id: 1, estado: 1, createdAt: -1 },
+    { name: 'idx_ordenes_usuario_estado_fecha' },
 );
 // Compuesto: pedidos de un restaurante por estado
 OrdenSchema.index(
