@@ -19,6 +19,14 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3000/',
         changeOrigin: true,
+        // Suprimir ECONNREFUSED durante el arranque de la API (race condition normal)
+        configure(proxy) {
+          proxy.on('error', (err: NodeJS.ErrnoException) => {
+            if (err.code !== 'ECONNREFUSED') {
+              console.error('[proxy]', err.message)
+            }
+          })
+        },
       },
     },
   },
