@@ -2,13 +2,44 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Resena, ResenaDocument } from './schemas/resena.schema';
+import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
+import { Orden } from '../ordenes/schemas/orden.schema';
 
 @Injectable()
 export class ResenasService {
-    constructor(@InjectModel(Resena.name) private resenaModel: Model<ResenaDocument>) { }
+    constructor(
+        @InjectModel(Resena.name) private resenaModel: Model<ResenaDocument>,
+        @InjectModel(Restaurante.name) private restauranteModel: Model<any>,
+        @InjectModel(Orden.name) private ordenModel: Model<any>,
+    ) { }
 
     async create(data: any): Promise<ResenaDocument> {
-        return this.resenaModel.create(data);
+        const resena = await this.resenaModel.create(data);
+
+        // Actualizar calificacion_prom y total_resenas del restaurante (campo desnormalizado)
+        if (data.restaurante_id) {
+            const [stats] = await this.resenaModel.aggregate([
+                { $match: { restaurante_id: new Types.ObjectId(data.restaurante_id), activa: true } },
+                { $group: { _id: null, avg: { $avg: '$calificacion' }, count: { $sum: 1 } } },
+            ]);
+            if (stats) {
+                await this.restauranteModel.findByIdAndUpdate(data.restaurante_id, {
+                    $set: {
+                        calificacion_prom: Math.round(stats.avg * 10) / 10,
+                        total_resenas: stats.count,
+                    },
+                });
+            }
+        }
+
+        // Marcar la orden como reseñada (campo desnormalizado, evita $lookup)
+        if (data.orden_id) {
+            await this.ordenModel.findByIdAndUpdate(data.orden_id, {
+                $set: { tiene_resena: true },
+            });
+        }
+
+        return resena;
     }
 
     async findByRestaurant(

@@ -64,4 +64,23 @@ export class ReportesController {
     restaurantesPorCategoria() {
         return this.reportesService.restaurantesPorCategoria();
     }
+
+    @Get('revenue/by-restaurant-month')
+    @ApiOperation({
+        summary: 'Ingresos por restaurante por mes',
+        description: 'Aggregation: $group por restaurante_id + año + mes → $lookup restaurante. Muestra el mes más reciente primero.',
+    })
+    ingresosPorRestaurantePorMes() {
+        return this.reportesService.ingresosPorRestaurantePorMes();
+    }
+
+    @Get('users/top-spenders')
+    @ApiOperation({
+        summary: 'Usuarios con mayor gasto',
+        description: 'Aggregation: $match entregado → $group por usuario_id con $sum total → $sort → $lookup usuario (sin password).',
+    })
+    @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+    usuariosConMayorGasto(@Query('limit') limit: string) {
+        return this.reportesService.usuariosConMayorGasto(+limit || 10);
+    }
 }

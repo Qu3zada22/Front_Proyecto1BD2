@@ -22,7 +22,7 @@ export type UsuarioDocument = HydratedDocument<Usuario>;
 
 export type Rol = 'cliente' | 'propietario' | 'admin';
 
-@Schema({ timestamps: true, collection: 'usuarios' })
+@Schema({ timestamps: false, collection: 'usuarios' })
 export class Usuario {
     @Prop({ required: true }) nombre: string;
 

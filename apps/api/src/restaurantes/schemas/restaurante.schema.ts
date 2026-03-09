@@ -23,7 +23,7 @@ export const DireccionRestauranteSchema = SchemaFactory.createForClass(Direccion
 // ---- Restaurante ----
 export type RestauranteDocument = HydratedDocument<Restaurante>;
 
-@Schema({ timestamps: true, collection: 'restaurantes' })
+@Schema({ timestamps: false, collection: 'restaurantes' })
 export class Restaurante {
     @Prop({ type: Types.ObjectId, ref: 'Usuario', required: true })
     propietario_id: Types.ObjectId;

@@ -4,6 +4,8 @@ import { NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { ResenasService } from './resenas.service';
 import { Resena } from './schemas/resena.schema';
+import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
+import { Orden } from '../ordenes/schemas/orden.schema';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -20,17 +22,21 @@ function createMockQuery(resolvedValue: any) {
   return query;
 }
 
-const mockModel = {
+const mockResenaModel = {
   create: jest.fn(),
   find: jest.fn(),
   findById: jest.fn(),
   findByIdAndUpdate: jest.fn(),
   findByIdAndDelete: jest.fn(),
-  findOne: jest.fn(),
-  updateMany: jest.fn(),
-  deleteMany: jest.fn(),
   aggregate: jest.fn(),
-  distinct: jest.fn(),
+};
+
+const mockRestauranteModel = {
+  findByIdAndUpdate: jest.fn().mockResolvedValue({}),
+};
+
+const mockOrdenModel = {
+  findByIdAndUpdate: jest.fn().mockResolvedValue({}),
 };
 
 // ── suite ─────────────────────────────────────────────────────────────────────
@@ -40,14 +46,15 @@ describe('ResenasService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockRestauranteModel.findByIdAndUpdate.mockResolvedValue({});
+    mockOrdenModel.findByIdAndUpdate.mockResolvedValue({});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResenasService,
-        {
-          provide: getModelToken(Resena.name),
-          useValue: mockModel,
-        },
+        { provide: getModelToken(Resena.name), useValue: mockResenaModel },
+        { provide: getModelToken(Restaurante.name), useValue: mockRestauranteModel },
+        { provide: getModelToken(Orden.name), useValue: mockOrdenModel },
       ],
     }).compile();
 
@@ -57,20 +64,65 @@ describe('ResenasService', () => {
   // ── create ──────────────────────────────────────────────────────────────────
 
   describe('create', () => {
+    const restauranteId = new Types.ObjectId().toString();
+    const ordenId = new Types.ObjectId().toString();
+
     it('should call model.create with the provided data and return the result', async () => {
-      const data = {
-        usuario_id: new Types.ObjectId().toString(),
-        restaurante_id: new Types.ObjectId().toString(),
-        calificacion: 5,
-        comentario: 'Excelente!',
-      };
+      const data = { usuario_id: new Types.ObjectId().toString(), restaurante_id: restauranteId, calificacion: 5 };
       const created = { _id: 'r1', ...data };
-      mockModel.create.mockResolvedValue(created);
+      mockResenaModel.create.mockResolvedValue(created);
+      mockResenaModel.aggregate.mockResolvedValue([{ avg: 5, count: 1 }]);
 
       const result = await service.create(data);
 
-      expect(mockModel.create).toHaveBeenCalledWith(data);
+      expect(mockResenaModel.create).toHaveBeenCalledWith(data);
       expect(result).toEqual(created);
+    });
+
+    it('should update calificacion_prom and total_resenas on the restaurante after create', async () => {
+      const data = { usuario_id: 'u1', restaurante_id: restauranteId, calificacion: 4 };
+      mockResenaModel.create.mockResolvedValue({ _id: 'r1', ...data });
+      mockResenaModel.aggregate.mockResolvedValue([{ avg: 4.2, count: 10 }]);
+
+      await service.create(data);
+
+      expect(mockResenaModel.aggregate).toHaveBeenCalled();
+      expect(mockRestauranteModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        restauranteId,
+        expect.objectContaining({ $set: expect.objectContaining({ calificacion_prom: 4.2, total_resenas: 10 }) }),
+      );
+    });
+
+    it('should update tiene_resena on the orden when orden_id is provided', async () => {
+      const data = { usuario_id: 'u1', restaurante_id: restauranteId, orden_id: ordenId, calificacion: 5 };
+      mockResenaModel.create.mockResolvedValue({ _id: 'r1', ...data });
+      mockResenaModel.aggregate.mockResolvedValue([{ avg: 5, count: 1 }]);
+
+      await service.create(data);
+
+      expect(mockOrdenModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        ordenId,
+        { $set: { tiene_resena: true } },
+      );
+    });
+
+    it('should NOT update restaurante when restaurante_id is absent', async () => {
+      const data = { usuario_id: 'u1', calificacion: 3 };
+      mockResenaModel.create.mockResolvedValue({ _id: 'r1', ...data });
+
+      await service.create(data);
+
+      expect(mockRestauranteModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should NOT update orden when orden_id is absent', async () => {
+      const data = { usuario_id: 'u1', restaurante_id: restauranteId, calificacion: 3 };
+      mockResenaModel.create.mockResolvedValue({ _id: 'r1', ...data });
+      mockResenaModel.aggregate.mockResolvedValue([{ avg: 3, count: 5 }]);
+
+      await service.create(data);
+
+      expect(mockOrdenModel.findByIdAndUpdate).not.toHaveBeenCalled();
     });
   });
 
@@ -81,11 +133,11 @@ describe('ResenasService', () => {
 
     it('should filter by restaurante_id as ObjectId and activa: true', async () => {
       const query = createMockQuery([]);
-      mockModel.find.mockReturnValue(query);
+      mockResenaModel.find.mockReturnValue(query);
 
       await service.findByRestaurant(restauranteId);
 
-      const callArg = mockModel.find.mock.calls[0][0];
+      const callArg = mockResenaModel.find.mock.calls[0][0];
       expect(callArg.restaurante_id).toBeInstanceOf(Types.ObjectId);
       expect(callArg.restaurante_id.toString()).toBe(restauranteId);
       expect(callArg.activa).toBe(true);
@@ -93,7 +145,7 @@ describe('ResenasService', () => {
 
     it('should populate usuario_id with only the nombre field', async () => {
       const query = createMockQuery([]);
-      mockModel.find.mockReturnValue(query);
+      mockResenaModel.find.mockReturnValue(query);
 
       await service.findByRestaurant(restauranteId);
 
@@ -103,7 +155,7 @@ describe('ResenasService', () => {
     it('should use default sort by calificacion descending when sort is omitted', async () => {
       const resenas = [{ calificacion: 5 }, { calificacion: 4 }];
       const query = createMockQuery(resenas);
-      mockModel.find.mockReturnValue(query);
+      mockResenaModel.find.mockReturnValue(query);
 
       const result = await service.findByRestaurant(restauranteId);
 
@@ -113,7 +165,7 @@ describe('ResenasService', () => {
 
     it('should sort by calificacion descending when sort="calificacion"', async () => {
       const query = createMockQuery([]);
-      mockModel.find.mockReturnValue(query);
+      mockResenaModel.find.mockReturnValue(query);
 
       await service.findByRestaurant(restauranteId, 'calificacion');
 
@@ -122,7 +174,7 @@ describe('ResenasService', () => {
 
     it('should sort by fecha descending when sort="fecha"', async () => {
       const query = createMockQuery([]);
-      mockModel.find.mockReturnValue(query);
+      mockResenaModel.find.mockReturnValue(query);
 
       await service.findByRestaurant(restauranteId, 'fecha');
 
@@ -131,7 +183,7 @@ describe('ResenasService', () => {
 
     it('should apply default skip=0 and limit=10', async () => {
       const query = createMockQuery([]);
-      mockModel.find.mockReturnValue(query);
+      mockResenaModel.find.mockReturnValue(query);
 
       await service.findByRestaurant(restauranteId);
 
@@ -141,7 +193,7 @@ describe('ResenasService', () => {
 
     it('should apply custom skip and limit', async () => {
       const query = createMockQuery([]);
-      mockModel.find.mockReturnValue(query);
+      mockResenaModel.find.mockReturnValue(query);
 
       await service.findByRestaurant(restauranteId, 'calificacion', 5, 20);
 
@@ -151,7 +203,7 @@ describe('ResenasService', () => {
 
     it('should call lean and exec', async () => {
       const query = createMockQuery([]);
-      mockModel.find.mockReturnValue(query);
+      mockResenaModel.find.mockReturnValue(query);
 
       await service.findByRestaurant(restauranteId);
 
@@ -169,11 +221,11 @@ describe('ResenasService', () => {
     it('should call $addToSet on likes array with the userId as ObjectId', async () => {
       const updated = { _id: resenaId, likes: [new Types.ObjectId(userId)] };
       const query = createMockQuery(updated);
-      mockModel.findByIdAndUpdate.mockReturnValue(query);
+      mockResenaModel.findByIdAndUpdate.mockReturnValue(query);
 
       const result = await service.addLike(resenaId, userId);
 
-      expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
+      expect(mockResenaModel.findByIdAndUpdate).toHaveBeenCalledWith(
         resenaId,
         { $addToSet: { likes: new Types.ObjectId(userId) } },
         { new: true },
@@ -183,7 +235,7 @@ describe('ResenasService', () => {
 
     it('should throw NotFoundException when resena is not found', async () => {
       const query = createMockQuery(null);
-      mockModel.findByIdAndUpdate.mockReturnValue(query);
+      mockResenaModel.findByIdAndUpdate.mockReturnValue(query);
 
       await expect(service.addLike(resenaId, userId)).rejects.toThrow(NotFoundException);
       await expect(service.addLike(resenaId, userId)).rejects.toThrow('Reseña no encontrada');
@@ -192,7 +244,7 @@ describe('ResenasService', () => {
     it('should return the updated resena', async () => {
       const updated = { _id: resenaId, likes: [new Types.ObjectId(userId)] };
       const query = createMockQuery(updated);
-      mockModel.findByIdAndUpdate.mockReturnValue(query);
+      mockResenaModel.findByIdAndUpdate.mockReturnValue(query);
 
       const result = await service.addLike(resenaId, userId);
 
@@ -209,11 +261,11 @@ describe('ResenasService', () => {
     it('should call $pull on likes array to remove the userId', async () => {
       const updated = { _id: resenaId, likes: [] };
       const query = createMockQuery(updated);
-      mockModel.findByIdAndUpdate.mockReturnValue(query);
+      mockResenaModel.findByIdAndUpdate.mockReturnValue(query);
 
       const result = await service.removeLike(resenaId, userId);
 
-      expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
+      expect(mockResenaModel.findByIdAndUpdate).toHaveBeenCalledWith(
         resenaId,
         { $pull: { likes: new Types.ObjectId(userId) } },
         { new: true },
@@ -223,7 +275,7 @@ describe('ResenasService', () => {
 
     it('should throw NotFoundException when resena is not found', async () => {
       const query = createMockQuery(null);
-      mockModel.findByIdAndUpdate.mockReturnValue(query);
+      mockResenaModel.findByIdAndUpdate.mockReturnValue(query);
 
       await expect(service.removeLike(resenaId, userId)).rejects.toThrow(NotFoundException);
       await expect(service.removeLike(resenaId, userId)).rejects.toThrow('Reseña no encontrada');
@@ -231,18 +283,18 @@ describe('ResenasService', () => {
 
     it('addLike and removeLike use different MongoDB operators', async () => {
       const query = createMockQuery({ _id: resenaId, likes: [] });
-      mockModel.findByIdAndUpdate.mockReturnValue(query);
+      mockResenaModel.findByIdAndUpdate.mockReturnValue(query);
 
       await service.addLike(resenaId, userId);
-      const addCall = mockModel.findByIdAndUpdate.mock.calls[0][1];
+      const addCall = mockResenaModel.findByIdAndUpdate.mock.calls[0][1];
       expect(addCall.$addToSet).toBeDefined();
       expect(addCall.$pull).toBeUndefined();
 
       jest.clearAllMocks();
-      mockModel.findByIdAndUpdate.mockReturnValue(query);
+      mockResenaModel.findByIdAndUpdate.mockReturnValue(query);
 
       await service.removeLike(resenaId, userId);
-      const removeCall = mockModel.findByIdAndUpdate.mock.calls[0][1];
+      const removeCall = mockResenaModel.findByIdAndUpdate.mock.calls[0][1];
       expect(removeCall.$pull).toBeDefined();
       expect(removeCall.$addToSet).toBeUndefined();
     });
@@ -253,17 +305,17 @@ describe('ResenasService', () => {
   describe('remove', () => {
     it('should delete resena and return { deleted: true }', async () => {
       const query = createMockQuery({ _id: 'r1' });
-      mockModel.findByIdAndDelete.mockReturnValue(query);
+      mockResenaModel.findByIdAndDelete.mockReturnValue(query);
 
       const result = await service.remove('r1');
 
-      expect(mockModel.findByIdAndDelete).toHaveBeenCalledWith('r1');
+      expect(mockResenaModel.findByIdAndDelete).toHaveBeenCalledWith('r1');
       expect(result).toEqual({ deleted: true });
     });
 
     it('should throw NotFoundException when resena is not found', async () => {
       const query = createMockQuery(null);
-      mockModel.findByIdAndDelete.mockReturnValue(query);
+      mockResenaModel.findByIdAndDelete.mockReturnValue(query);
 
       await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
       await expect(service.remove('nonexistent')).rejects.toThrow('Reseña no encontrada');

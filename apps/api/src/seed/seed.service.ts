@@ -1,7 +1,8 @@
 import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Connection, Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
+import { GridFSBucket } from 'mongodb';
 import { spawn } from 'child_process';
 import * as path from 'path';
 import { Usuario } from '../usuarios/schemas/usuario.schema';
@@ -20,6 +21,7 @@ export class SeedService {
         @InjectModel(MenuItem.name) private menuItemModel: Model<any>,
         @InjectModel(Orden.name) private ordenModel: Model<any>,
         @InjectModel(Resena.name) private resenaModel: Model<any>,
+        @InjectConnection() private connection: Connection,
         private readonly config: ConfigService,
     ) { }
 
@@ -72,12 +74,14 @@ export class SeedService {
     }
 
     async clearAll(): Promise<void> {
+        const bucket = new GridFSBucket(this.connection.db as any, { bucketName: 'media' });
         await Promise.all([
             this.usuarioModel.deleteMany({}),
             this.restauranteModel.deleteMany({}),
             this.menuItemModel.deleteMany({}),
             this.ordenModel.deleteMany({}),
             this.resenaModel.deleteMany({}),
+            bucket.drop().catch(() => {}),
         ]);
     }
 }

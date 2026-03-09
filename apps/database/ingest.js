@@ -18,6 +18,7 @@
 import { connect, disconnect } from './db.js'
 import { createAllIndexes } from './operations/indexes.js'
 import { uploadBuffer, transparentPNG } from './operations/gridfs.js'
+import { GridFSBucket } from 'mongodb'
 import { users } from './data/01_users.js'
 import { buildRestaurants } from './data/02_restaurants.js'
 import { buildMenuItems } from './data/03_menu_items.js'
@@ -38,6 +39,10 @@ async function main() {
     await db.collection(col).drop().catch(() => {})
     console.log(`  dropped: ${col}`)
   }
+  // Limpiar GridFS (media.files + media.chunks)
+  const bucket = new GridFSBucket(db, { bucketName: 'media' })
+  await bucket.drop().catch(() => {})
+  console.log('  dropped: media (GridFS)')
 
   // ── 1. Índices (en colecciones vacías) ─────────────────────
   console.log('\nCreating indexes...')

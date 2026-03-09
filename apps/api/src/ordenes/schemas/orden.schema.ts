@@ -3,8 +3,7 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export type EstadoOrden =
     | 'pendiente'
-    | 'confirmado'
-    | 'en_proceso'   // alias usado por seed
+    | 'en_proceso'
     | 'en_camino'
     | 'entregado'
     | 'cancelado';
@@ -52,7 +51,7 @@ export const DireccionEntregaSchema = SchemaFactory.createForClass(DireccionEntr
 // ---- Orden ----
 export type OrdenDocument = HydratedDocument<Orden>;
 
-@Schema({ timestamps: true, collection: 'ordenes' })
+@Schema({ timestamps: false, collection: 'ordenes' })
 export class Orden {
     @Prop({ type: Types.ObjectId, ref: 'Usuario', required: true })
     usuario_id: Types.ObjectId;
@@ -66,7 +65,7 @@ export class Orden {
 
     @Prop({
         type: String,
-        enum: ['pendiente', 'confirmado', 'en_proceso', 'en_camino', 'entregado', 'cancelado'],
+        enum: ['pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado'],
         default: 'pendiente',
     })
     estado: EstadoOrden;
