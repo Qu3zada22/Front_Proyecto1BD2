@@ -6,6 +6,8 @@ import { Types } from 'mongoose';
 import { OrdenesService } from './ordenes.service';
 import { Orden } from './schemas/orden.schema';
 import { MenuItem } from '../menu-items/schemas/menu-item.schema';
+import { Usuario } from '../usuarios/schemas/usuario.schema';
+import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,6 +56,14 @@ const mockMenuItemModel = {
   countDocuments: jest.fn(),
 };
 
+const mockUsuarioModel = {
+  countDocuments: jest.fn(),
+};
+
+const mockRestauranteModel = {
+  countDocuments: jest.fn(),
+};
+
 // ── suite ─────────────────────────────────────────────────────────────────────
 
 describe('OrdenesService', () => {
@@ -62,13 +72,16 @@ describe('OrdenesService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    // Default: ambos items del baseDto están disponibles
+    // Default: ambos items del baseDto están disponibles (con nombre y precio de BD)
     mockMenuItemModel.find.mockReturnValue({
       lean: jest.fn().mockResolvedValue([
-        { _id: '507f1f77bcf86cd799439031' },
-        { _id: '507f1f77bcf86cd799439032' },
+        { _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger', precio: 45 },
+        { _id: new Types.ObjectId('507f1f77bcf86cd799439032'), nombre: 'Fries', precio: 20 },
       ]),
     });
+    // Default: FK validation pasa
+    mockUsuarioModel.countDocuments.mockResolvedValue(1);
+    mockRestauranteModel.countDocuments.mockResolvedValue(1);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -80,6 +93,14 @@ describe('OrdenesService', () => {
         {
           provide: getModelToken(MenuItem.name),
           useValue: mockMenuItemModel,
+        },
+        {
+          provide: getModelToken(Usuario.name),
+          useValue: mockUsuarioModel,
+        },
+        {
+          provide: getModelToken(Restaurante.name),
+          useValue: mockRestauranteModel,
         },
         {
           provide: getConnectionToken(),
@@ -160,7 +181,7 @@ describe('OrdenesService', () => {
       expect(options).toMatchObject({ session: mockSession });
     });
 
-    it('should check disponible:true for all items inside the ACID session', async () => {
+    it('should check disponible:true for all items inside the ACID session and read nombre+precio', async () => {
       mockOrdenModel.create.mockResolvedValue([{ _id: 'orden1', total: 110 }]);
       mockMenuItemModel.bulkWrite.mockResolvedValue({});
 
@@ -168,7 +189,7 @@ describe('OrdenesService', () => {
 
       expect(mockMenuItemModel.find).toHaveBeenCalledWith(
         expect.objectContaining({ disponible: true }),
-        { _id: 1 },
+        { _id: 1, nombre: 1, precio: 1 },
         { session: mockSession },
       );
     });
@@ -176,7 +197,7 @@ describe('OrdenesService', () => {
     it('should throw BadRequestException when an item is not disponible', async () => {
       // find returns only 1 of 2 items → one is unavailable
       mockMenuItemModel.find.mockReturnValue({
-        lean: jest.fn().mockResolvedValue([{ _id: '507f1f77bcf86cd799439031' }]),
+        lean: jest.fn().mockResolvedValue([{ _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger', precio: 45 }]),
       });
 
       await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
@@ -192,9 +213,9 @@ describe('OrdenesService', () => {
           { menu_item_id: '507f1f77bcf86cd799439031', nombre: 'Burger', precio: 45, cantidad: 1 },
         ],
       };
-      // find returns 1 unique item (deduped) — check should pass (1 === 1)
+      // find returns 1 unique item (deduped) with nombre+precio — check should pass (1 === 1)
       mockMenuItemModel.find.mockReturnValue({
-        lean: jest.fn().mockResolvedValue([{ _id: '507f1f77bcf86cd799439031' }]),
+        lean: jest.fn().mockResolvedValue([{ _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger', precio: 45 }]),
       });
       mockOrdenModel.create.mockResolvedValue([{ _id: 'orden1', total: 135 }]);
       mockMenuItemModel.bulkWrite.mockResolvedValue({});
@@ -224,6 +245,43 @@ describe('OrdenesService', () => {
       }
 
       expect(mockSession.endSession).toHaveBeenCalled();
+    });
+
+    it('should use DB prices instead of DTO prices (BUG-01)', async () => {
+      // DB returns different prices than DTO
+      mockMenuItemModel.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([
+          { _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger Real', precio: 50 },
+          { _id: new Types.ObjectId('507f1f77bcf86cd799439032'), nombre: 'Fries Real', precio: 25 },
+        ]),
+      });
+      const created = { _id: 'orden1', total: 125 };
+      mockOrdenModel.create.mockResolvedValue([created]);
+      mockMenuItemModel.bulkWrite.mockResolvedValue({});
+
+      await service.create(baseDto as any);
+
+      const createCall = mockOrdenModel.create.mock.calls[0][0][0];
+      // Total recalculado: 50*2 + 25*1 = 125 (no 45*2 + 20*1 = 110)
+      expect(createCall.total).toBe(125);
+      expect(createCall.items[0].nombre).toBe('Burger Real');
+      expect(createCall.items[0].precio_unitario).toBe(50);
+      expect(createCall.items[1].nombre).toBe('Fries Real');
+      expect(createCall.items[1].precio_unitario).toBe(25);
+    });
+
+    it('should throw BadRequestException when usuario_id does not exist (OBS-01 FK)', async () => {
+      mockUsuarioModel.countDocuments.mockResolvedValue(0);
+
+      await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
+      await expect(service.create(baseDto as any)).rejects.toThrow('usuario referenciado no existe');
+    });
+
+    it('should throw BadRequestException when restaurante_id does not exist (OBS-01 FK)', async () => {
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
+
+      await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
+      await expect(service.create(baseDto as any)).rejects.toThrow('restaurante referenciado no existe');
     });
   });
 

@@ -3,6 +3,8 @@ import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import { Orden, OrdenDocument, EstadoOrden } from './schemas/orden.schema';
 import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
+import { Usuario } from '../usuarios/schemas/usuario.schema';
+import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
 import { CreateOrdenDto } from './dto/create-orden.dto';
 
 const ESTADOS_VALIDOS: EstadoOrden[] = [
@@ -22,37 +24,50 @@ export class OrdenesService {
     constructor(
         @InjectModel(Orden.name) private ordenModel: Model<OrdenDocument>,
         @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
+        @InjectModel(Usuario.name) private usuarioModel: Model<any>,
+        @InjectModel(Restaurante.name) private restauranteModel: Model<any>,
         @InjectConnection() private connection: Connection,
     ) { }
 
     // Transacción ACID: insert orden + bulkWrite $inc veces_ordenado
     async create(dto: CreateOrdenDto): Promise<OrdenDocument> {
-        // Mapear items: normalizar campos para consistencia con seed y aggregations
-        const itemsMapped = dto.items.map((i) => ({
-            item_id: new Types.ObjectId(i.menu_item_id),
-            menu_item_id: new Types.ObjectId(i.menu_item_id),
-            nombre: i.nombre,
-            precio_unitario: i.precio,
-            precio: i.precio,
-            cantidad: i.cantidad,
-            subtotal: i.precio * i.cantidad,
-            ...(i.notas && { notas: i.notas }),
-        }));
+        // OBS-01: Validar FK — usuario_id y restaurante_id deben existir
+        const [userExists, restExists] = await Promise.all([
+            this.usuarioModel.countDocuments({ _id: dto.usuario_id }),
+            this.restauranteModel.countDocuments({ _id: dto.restaurante_id }),
+        ]);
+        if (!userExists) throw new BadRequestException('El usuario referenciado no existe');
+        if (!restExists) throw new BadRequestException('El restaurante referenciado no existe');
 
-        const total = itemsMapped.reduce((sum, i) => sum + i.subtotal, 0);
         const session = await this.connection.startSession();
         session.startTransaction();
         try {
-            // Paso 1 (PDF spec): verificar disponible:true en todos los platillos
-            // Deduplicar IDs: $in deduplica en MongoDB, el length debe compararse contra únicos
-            const uniqueItemIds = [...new Set(itemsMapped.map(i => i.item_id.toHexString()))]
+            // Paso 1 (PDF spec): verificar disponible:true y leer precios reales
+            const uniqueItemIds = [...new Set(dto.items.map(i => new Types.ObjectId(i.menu_item_id).toHexString()))]
                 .map(hex => new Types.ObjectId(hex));
-            const disponibles = await this.menuItemModel
-                .find({ _id: { $in: uniqueItemIds }, disponible: true }, { _id: 1 }, { session })
+            const dbItems = await this.menuItemModel
+                .find({ _id: { $in: uniqueItemIds }, disponible: true }, { _id: 1, nombre: 1, precio: 1 }, { session })
                 .lean();
-            if (disponibles.length !== uniqueItemIds.length) {
+            if (dbItems.length !== uniqueItemIds.length) {
                 throw new BadRequestException('Uno o más platillos no están disponibles');
             }
+
+            // Paso 2 (PDF spec): recalcular snapshot con precios actuales de BD
+            const dbMap = new Map((dbItems as any[]).map(i => [i._id.toHexString(), i]));
+            const itemsMapped = dto.items.map((i) => {
+                const dbItem = dbMap.get(new Types.ObjectId(i.menu_item_id).toHexString())!;
+                return {
+                    item_id: new Types.ObjectId(i.menu_item_id),
+                    menu_item_id: new Types.ObjectId(i.menu_item_id),
+                    nombre: (dbItem as any).nombre,
+                    precio_unitario: (dbItem as any).precio,
+                    precio: (dbItem as any).precio,
+                    cantidad: i.cantidad,
+                    subtotal: (dbItem as any).precio * i.cantidad,
+                    ...(i.notas && { notas: i.notas }),
+                };
+            });
+            const total = itemsMapped.reduce((sum, i) => sum + i.subtotal, 0);
 
             const [orden] = await this.ordenModel.create(
                 [{ ...dto, items: itemsMapped, total }] as any[],

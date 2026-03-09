@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsArray, Min, Max } from 'class-validator';
+import { IsString, IsInt, IsOptional, IsArray, Min, Max, MaxLength, MinLength } from 'class-validator';
 import { ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -15,13 +15,13 @@ export class CreateResenaDto {
     @IsString() orden_id?: string;
 
     @ApiProperty({ example: 5, minimum: 1, maximum: 5, description: 'Calificación de 1 a 5 estrellas' })
-    @IsNumber() @Min(1) @Max(5) calificacion: number;
+    @IsInt() @Min(1) @Max(5) calificacion: number;
 
-    @ApiPropertyOptional({ example: 'Excelente servicio' })
-    @IsOptional() @IsString() titulo?: string;
+    @ApiPropertyOptional({ example: 'Excelente servicio', maxLength: 100 })
+    @IsOptional() @IsString() @MaxLength(100) titulo?: string;
 
-    @ApiPropertyOptional({ example: 'La comida llegó caliente y bien presentada' })
-    @IsOptional() @IsString() comentario?: string;
+    @ApiPropertyOptional({ example: 'La comida llegó caliente y bien presentada', minLength: 10 })
+    @IsOptional() @IsString() @MinLength(10) comentario?: string;
 
     @ApiPropertyOptional({ example: ['rapido', 'sabroso'], type: [String] })
     @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];

@@ -23,9 +23,9 @@ export async function revenueByRestaurant(db) {
     {
       $group: {
         _id: '$restaurante_id',
-        total_revenue: { $sum: '$total' },
+        total_revenue: { $sum: { $toDecimal: '$total' } },
         num_ordenes: { $sum: 1 },
-        ticket_prom: { $avg: '$total' },
+        ticket_prom: { $avg: { $toDecimal: '$total' } },
       },
     },
     { $sort: { total_revenue: -1 } },
@@ -165,7 +165,7 @@ export async function clientesMasActivos(db, limit = 5) {
       $group: {
         _id: '$usuario_id',
         total_ordenes: { $sum: 1 },
-        total_gastado: { $sum: '$total' },
+        total_gastado: { $sum: { $toDecimal: '$total' } },
       },
     },
     { $sort: { total_ordenes: -1 } },
