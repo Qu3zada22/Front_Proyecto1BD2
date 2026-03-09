@@ -268,16 +268,16 @@ describe('OrdenesService', () => {
 
   describe('updateStatus', () => {
     it('should update with $set estado AND $push to historial_estados', async () => {
-      const updated = { _id: 'o1', estado: 'confirmado' };
+      const updated = { _id: 'o1', estado: 'en_proceso' };
       const query = createMockQuery(updated);
       mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
 
-      const result = await service.updateStatus('o1', 'confirmado');
+      const result = await service.updateStatus('o1', 'en_proceso');
 
       const [id, update, opts] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
       expect(id).toBe('o1');
-      expect(update.$set.estado).toBe('confirmado');
-      expect(update.$push.historial_estados).toMatchObject({ estado: 'confirmado' });
+      expect(update.$set.estado).toBe('en_proceso');
+      expect(update.$push.historial_estados).toMatchObject({ estado: 'en_proceso' });
       expect(update.$push.historial_estados.timestamp).toBeInstanceOf(Date);
       expect(opts).toEqual({ new: true });
       expect(result).toEqual(updated);
@@ -305,10 +305,10 @@ describe('OrdenesService', () => {
 
     it('should include actor_id in historial entry when provided', async () => {
       const actorId = '507f1f77bcf86cd799439099';
-      const query = createMockQuery({ _id: 'o1', estado: 'confirmado' });
+      const query = createMockQuery({ _id: 'o1', estado: 'en_proceso' });
       mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
 
-      await service.updateStatus('o1', 'confirmado', actorId);
+      await service.updateStatus('o1', 'en_proceso', actorId);
 
       const [, update] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
       expect(update.$push.historial_estados.actor_id).toBeInstanceOf(Types.ObjectId);
@@ -326,7 +326,7 @@ describe('OrdenesService', () => {
     });
 
     it('should accept all valid estado values including en_proceso', async () => {
-      const validStates = ['pendiente', 'confirmado', 'en_proceso', 'en_camino', 'entregado', 'cancelado'];
+      const validStates = ['pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado'];
 
       for (const estado of validStates) {
         jest.clearAllMocks();
@@ -349,10 +349,10 @@ describe('OrdenesService', () => {
       const query = createMockQuery(null);
       mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
 
-      await expect(service.updateStatus('nonexistent', 'confirmado')).rejects.toThrow(
+      await expect(service.updateStatus('nonexistent', 'en_proceso')).rejects.toThrow(
         NotFoundException,
       );
-      await expect(service.updateStatus('nonexistent', 'confirmado')).rejects.toThrow(
+      await expect(service.updateStatus('nonexistent', 'en_proceso')).rejects.toThrow(
         'Orden no encontrada',
       );
     });

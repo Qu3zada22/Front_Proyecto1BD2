@@ -1,9 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getModelToken } from '@nestjs/mongoose';
+import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { InternalServerErrorException } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { SeedService } from './seed.service';
+
+// ── mock GridFSBucket ─────────────────────────────────────────────────────────
+
+jest.mock('mongodb', () => {
+  const actual = jest.requireActual('mongodb');
+  return {
+    ...actual,
+    GridFSBucket: jest.fn().mockImplementation(() => ({
+      drop: jest.fn().mockResolvedValue(undefined),
+    })),
+  };
+});
 import { Usuario } from '../usuarios/schemas/usuario.schema';
 import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
 import { MenuItem } from '../menu-items/schemas/menu-item.schema';
@@ -68,6 +80,10 @@ describe('SeedService', () => {
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue('mongodb://localhost:27017/fastpochi') },
+        },
+        {
+          provide: getConnectionToken(),
+          useValue: { db: { databaseName: 'fastpochi' } },
         },
       ],
     }).compile();

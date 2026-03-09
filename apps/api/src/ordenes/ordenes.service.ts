@@ -6,7 +6,7 @@ import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.sche
 import { CreateOrdenDto } from './dto/create-orden.dto';
 
 const ESTADOS_VALIDOS: EstadoOrden[] = [
-    'pendiente', 'confirmado', 'en_proceso', 'en_camino', 'entregado', 'cancelado',
+    'pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado',
 ];
 
 @Injectable()
@@ -19,19 +19,31 @@ export class OrdenesService {
 
     // Transacción ACID: insert orden + bulkWrite $inc veces_ordenado
     async create(dto: CreateOrdenDto): Promise<OrdenDocument> {
-        const total = dto.items.reduce((sum, i) => sum + i.precio * i.cantidad, 0);
+        // Mapear items: normalizar campos para consistencia con seed y aggregations
+        const itemsMapped = dto.items.map((i) => ({
+            item_id: new Types.ObjectId(i.menu_item_id),
+            menu_item_id: new Types.ObjectId(i.menu_item_id),
+            nombre: i.nombre,
+            precio_unitario: i.precio,
+            precio: i.precio,
+            cantidad: i.cantidad,
+            subtotal: i.precio * i.cantidad,
+            ...(i.notas && { notas: i.notas }),
+        }));
+
+        const total = itemsMapped.reduce((sum, i) => sum + i.subtotal, 0);
         const session = await this.connection.startSession();
         session.startTransaction();
         try {
             const [orden] = await this.ordenModel.create(
-                [{ ...dto, total }] as any[],
+                [{ ...dto, items: itemsMapped, total }] as any[],
                 { session },
             );
 
             // bulkWrite: $inc veces_ordenado en cada menu_item de la orden
-            const bulkOps = dto.items.map((item) => ({
+            const bulkOps = itemsMapped.map((item) => ({
                 updateOne: {
-                    filter: { _id: new Types.ObjectId(item.menu_item_id) },
+                    filter: { _id: item.item_id },
                     update: { $inc: { veces_ordenado: item.cantidad } },
                 },
             }));

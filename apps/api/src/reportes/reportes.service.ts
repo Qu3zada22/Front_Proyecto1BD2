@@ -143,4 +143,82 @@ export class ReportesService {
             { $sort: { total: -1 } },
         ]);
     }
+
+    // Ingresos por restaurante agrupados por mes
+    async ingresosPorRestaurantePorMes(): Promise<any[]> {
+        return this.ordenModel.aggregate([
+            { $match: { estado: 'entregado' } },
+            {
+                $group: {
+                    _id: {
+                        restaurante_id: '$restaurante_id',
+                        anio: { $year: '$fecha_creacion' },
+                        mes: { $month: '$fecha_creacion' },
+                    },
+                    total_ingresos: { $sum: { $toDouble: '$total' } },
+                    total_ordenes: { $sum: 1 },
+                    ticket_promedio: { $avg: { $toDouble: '$total' } },
+                },
+            },
+            { $sort: { '_id.anio': -1, '_id.mes': -1, total_ingresos: -1 } },
+            {
+                $lookup: {
+                    from: 'restaurantes',
+                    localField: '_id.restaurante_id',
+                    foreignField: '_id',
+                    pipeline: [{ $project: { nombre: 1, _id: 0 } }],
+                    as: 'restaurante',
+                },
+            },
+            {
+                $project: {
+                    periodo: {
+                        $concat: [
+                            { $toString: '$_id.anio' },
+                            '-',
+                            { $toString: '$_id.mes' },
+                        ],
+                    },
+                    restaurante: { $arrayElemAt: ['$restaurante.nombre', 0] },
+                    total_ingresos: { $round: ['$total_ingresos', 2] },
+                    total_ordenes: 1,
+                    ticket_promedio: { $round: ['$ticket_promedio', 2] },
+                    _id: 0,
+                },
+            },
+        ]);
+    }
+
+    // Top usuarios por gasto acumulado en órdenes entregadas
+    async usuariosConMayorGasto(limit = 10): Promise<any[]> {
+        return this.ordenModel.aggregate([
+            { $match: { estado: 'entregado' } },
+            {
+                $group: {
+                    _id: '$usuario_id',
+                    total_gastado: { $sum: { $toDouble: '$total' } },
+                    total_ordenes: { $sum: 1 },
+                },
+            },
+            { $sort: { total_gastado: -1 } },
+            { $limit: limit },
+            {
+                $lookup: {
+                    from: 'usuarios',
+                    localField: '_id',
+                    foreignField: '_id',
+                    pipeline: [{ $project: { nombre: 1, email: 1, _id: 0 } }],
+                    as: 'usuario',
+                },
+            },
+            {
+                $project: {
+                    usuario: { $arrayElemAt: ['$usuario', 0] },
+                    total_gastado: { $round: ['$total_gastado', 2] },
+                    total_ordenes: 1,
+                    _id: 0,
+                },
+            },
+        ]);
+    }
 }
