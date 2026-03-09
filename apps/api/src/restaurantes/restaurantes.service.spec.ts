@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getModelToken } from '@nestjs/mongoose';
+import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
 import { NotFoundException } from '@nestjs/common';
 import { RestaurantesService } from './restaurantes.service';
 import { Restaurante } from './schemas/restaurante.schema';
+import { MenuItem } from '../menu-items/schemas/menu-item.schema';
+import { Orden } from '../ordenes/schemas/orden.schema';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -19,6 +21,17 @@ function createMockQuery(resolvedValue: any) {
   return query;
 }
 
+const mockSession = {
+  startTransaction: jest.fn(),
+  commitTransaction: jest.fn(),
+  abortTransaction: jest.fn(),
+  endSession: jest.fn(),
+};
+
+const mockConnection = {
+  startSession: jest.fn().mockResolvedValue(mockSession),
+};
+
 const mockModel = {
   create: jest.fn(),
   find: jest.fn(),
@@ -32,6 +45,14 @@ const mockModel = {
   distinct: jest.fn(),
 };
 
+const mockMenuItemModel = {
+  updateMany: jest.fn(),
+};
+
+const mockOrdenModel = {
+  updateMany: jest.fn(),
+};
+
 // ── suite ─────────────────────────────────────────────────────────────────────
 
 describe('RestaurantesService', () => {
@@ -39,14 +60,17 @@ describe('RestaurantesService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockConnection.startSession.mockResolvedValue(mockSession);
+    mockMenuItemModel.updateMany.mockResolvedValue({ modifiedCount: 5 });
+    mockOrdenModel.updateMany.mockResolvedValue({ modifiedCount: 3 });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RestaurantesService,
-        {
-          provide: getModelToken(Restaurante.name),
-          useValue: mockModel,
-        },
+        { provide: getModelToken(Restaurante.name), useValue: mockModel },
+        { provide: getModelToken(MenuItem.name), useValue: mockMenuItemModel },
+        { provide: getModelToken(Orden.name), useValue: mockOrdenModel },
+        { provide: getConnectionToken(), useValue: mockConnection },
       ],
     }).compile();
 
@@ -247,6 +271,97 @@ describe('RestaurantesService', () => {
 
       await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
       await expect(service.remove('nonexistent')).rejects.toThrow('Restaurante no encontrado');
+    });
+  });
+
+  // ── cancelarRestaurante (ACID transaction) ───────────────────────────────────
+
+  describe('cancelarRestaurante', () => {
+    const restauranteId = '507f1f77bcf86cd799439011';
+    const restauranteDoc = { _id: restauranteId, activo: false };
+
+    it('should start a session and commit transaction on success', async () => {
+      const query = createMockQuery(restauranteDoc);
+      mockModel.findByIdAndUpdate.mockReturnValue(query);
+
+      await service.cancelarRestaurante(restauranteId);
+
+      expect(mockConnection.startSession).toHaveBeenCalled();
+      expect(mockSession.startTransaction).toHaveBeenCalled();
+      expect(mockSession.commitTransaction).toHaveBeenCalled();
+      expect(mockSession.abortTransaction).not.toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
+    });
+
+    it('should set activo=false on the restaurante within the session', async () => {
+      const query = createMockQuery(restauranteDoc);
+      mockModel.findByIdAndUpdate.mockReturnValue(query);
+
+      await service.cancelarRestaurante(restauranteId);
+
+      const [id, update, opts] = mockModel.findByIdAndUpdate.mock.calls[0];
+      expect(id).toBe(restauranteId);
+      expect(update).toEqual({ $set: { activo: false } });
+      expect(opts).toMatchObject({ new: true, session: mockSession });
+    });
+
+    it('should set disponible=false on all menu items of the restaurant', async () => {
+      const query = createMockQuery(restauranteDoc);
+      mockModel.findByIdAndUpdate.mockReturnValue(query);
+
+      await service.cancelarRestaurante(restauranteId);
+
+      expect(mockMenuItemModel.updateMany).toHaveBeenCalledWith(
+        { restaurante_id: restauranteDoc._id },
+        { $set: { disponible: false } },
+        { session: mockSession },
+      );
+    });
+
+    it('should cancel all active orders and push to historial_estados', async () => {
+      const query = createMockQuery(restauranteDoc);
+      mockModel.findByIdAndUpdate.mockReturnValue(query);
+
+      await service.cancelarRestaurante(restauranteId);
+
+      const [filter, update, opts] = mockOrdenModel.updateMany.mock.calls[0];
+      expect(filter.restaurante_id).toBe(restauranteDoc._id);
+      expect(filter.estado.$in).toEqual(
+        expect.arrayContaining(['pendiente', 'en_proceso', 'en_camino']),
+      );
+      expect(update.$set.estado).toBe('cancelado');
+      expect(update.$push.historial_estados).toMatchObject({ estado: 'cancelado' });
+      expect(opts).toMatchObject({ session: mockSession });
+    });
+
+    it('should return { cancelado: true, restaurante_id }', async () => {
+      const query = createMockQuery(restauranteDoc);
+      mockModel.findByIdAndUpdate.mockReturnValue(query);
+
+      const result = await service.cancelarRestaurante(restauranteId);
+
+      expect(result).toEqual({ cancelado: true, restaurante_id: restauranteId });
+    });
+
+    it('should throw NotFoundException and abort when restaurante is not found', async () => {
+      const query = createMockQuery(null);
+      mockModel.findByIdAndUpdate.mockReturnValue(query);
+
+      await expect(service.cancelarRestaurante('nonexistent')).rejects.toThrow(NotFoundException);
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
+    });
+
+    it('should always call endSession even when an error occurs', async () => {
+      mockModel.findByIdAndUpdate.mockReturnValue(createMockQuery(null));
+
+      try {
+        await service.cancelarRestaurante('nonexistent');
+      } catch {
+        // expected
+      }
+
+      expect(mockSession.endSession).toHaveBeenCalled();
     });
   });
 });
