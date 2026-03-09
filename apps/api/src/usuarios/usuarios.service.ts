@@ -1,11 +1,19 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Usuario, UsuarioDocument } from './schemas/usuario.schema';
+import { Orden } from '../ordenes/schemas/orden.schema';
+import { Resena } from '../resenas/schemas/resena.schema';
+import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
 
 @Injectable()
 export class UsuariosService {
-    constructor(@InjectModel(Usuario.name) private usuarioModel: Model<UsuarioDocument>) { }
+    constructor(
+        @InjectModel(Usuario.name) private usuarioModel: Model<UsuarioDocument>,
+        @InjectModel(Orden.name) private ordenModel: Model<any>,
+        @InjectModel(Resena.name) private resenaModel: Model<any>,
+        @InjectModel(Restaurante.name) private restauranteModel: Model<any>,
+    ) { }
 
     async create(data: any): Promise<UsuarioDocument> {
         if (data.email) {
@@ -53,6 +61,22 @@ export class UsuariosService {
     }
 
     async remove(id: string): Promise<{ deleted: boolean }> {
+        // Verificar datos asociados antes de eliminar
+        const [ordenes, resenas, restaurantes] = await Promise.all([
+            this.ordenModel.countDocuments({ usuario_id: id }),
+            this.resenaModel.countDocuments({ usuario_id: id }),
+            this.restauranteModel.countDocuments({ propietario_id: id }),
+        ]);
+        const asociados: string[] = [];
+        if (ordenes > 0) asociados.push(`${ordenes} orden(es)`);
+        if (resenas > 0) asociados.push(`${resenas} reseña(s)`);
+        if (restaurantes > 0) asociados.push(`${restaurantes} restaurante(s)`);
+        if (asociados.length > 0) {
+            throw new BadRequestException(
+                `No se puede eliminar: el usuario tiene ${asociados.join(', ')} asociados`,
+            );
+        }
+
         const result = await this.usuarioModel.findByIdAndDelete(id).exec();
         if (!result) throw new NotFoundException('Usuario no encontrado');
         return { deleted: true };

@@ -72,4 +72,11 @@ export class UsuariosController {
     ) {
         return this.usuariosService.removeAddress(id, alias);
     }
+
+    @Get('by-email/:email')
+    @ApiOperation({ summary: 'Buscar usuario por email exacto', description: 'Busca un usuario por email exacto. Útil para validación de duplicados.' })
+    @ApiParam({ name: 'email', description: 'Email exacto del usuario' })
+    findByEmail(@Param('email') email: string) {
+        return this.usuariosService.findByEmail(email);
+    }
 }

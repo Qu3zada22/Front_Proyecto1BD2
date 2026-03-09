@@ -99,30 +99,40 @@ export class ResenasService {
     }
 
     async remove(id: string): Promise<{ deleted: boolean }> {
-        const resena = await this.resenaModel.findByIdAndDelete(id).exec();
-        if (!resena) throw new NotFoundException('Reseña no encontrada');
+        const session = await this.connection.startSession();
+        session.startTransaction();
+        try {
+            const resena = await this.resenaModel.findByIdAndDelete(id, { session }).exec();
+            if (!resena) throw new NotFoundException('Reseña no encontrada');
 
-        // Recalcular calificacion_prom y total_resenas del restaurante
-        if (resena.restaurante_id) {
-            const [stats] = await this.resenaModel.aggregate([
-                { $match: { restaurante_id: resena.restaurante_id, activa: true } },
-                { $group: { _id: null, avg: { $avg: '$calificacion' }, count: { $sum: 1 } } },
-            ]);
-            await this.restauranteModel.findByIdAndUpdate(resena.restaurante_id, {
-                $set: {
-                    calificacion_prom: stats ? Math.round(stats.avg * 10) / 10 : 0,
-                    total_resenas: stats?.count ?? 0,
-                },
-            });
+            // Recalcular calificacion_prom y total_resenas del restaurante
+            if (resena.restaurante_id) {
+                const [stats] = await this.resenaModel.aggregate([
+                    { $match: { restaurante_id: resena.restaurante_id, activa: true } },
+                    { $group: { _id: null, avg: { $avg: '$calificacion' }, count: { $sum: 1 } } },
+                ]).session(session);
+                await this.restauranteModel.findByIdAndUpdate(resena.restaurante_id, {
+                    $set: {
+                        calificacion_prom: stats ? Math.round(stats.avg * 10) / 10 : 0,
+                        total_resenas: stats?.count ?? 0,
+                    },
+                }, { session });
+            }
+
+            // Resetear tiene_resena en la orden
+            if (resena.orden_id) {
+                await this.ordenModel.findByIdAndUpdate(resena.orden_id, {
+                    $set: { tiene_resena: false },
+                }, { session });
+            }
+
+            await session.commitTransaction();
+            return { deleted: true };
+        } catch (err) {
+            await session.abortTransaction();
+            throw err;
+        } finally {
+            await session.endSession();
         }
-
-        // Resetear tiene_resena en la orden
-        if (resena.orden_id) {
-            await this.ordenModel.findByIdAndUpdate(resena.orden_id, {
-                $set: { tiene_resena: false },
-            });
-        }
-
-        return { deleted: true };
     }
 }

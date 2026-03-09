@@ -1,8 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
 import { Usuario } from './schemas/usuario.schema';
+import { Orden } from '../ordenes/schemas/orden.schema';
+import { Resena } from '../resenas/schemas/resena.schema';
+import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +35,18 @@ const mockModel = {
   distinct: jest.fn(),
 };
 
+const mockOrdenModel = {
+  countDocuments: jest.fn(),
+};
+
+const mockResenaModel = {
+  countDocuments: jest.fn(),
+};
+
+const mockRestauranteModel = {
+  countDocuments: jest.fn(),
+};
+
 // ── suite ─────────────────────────────────────────────────────────────────────
 
 describe('UsuariosService', () => {
@@ -46,6 +61,18 @@ describe('UsuariosService', () => {
         {
           provide: getModelToken(Usuario.name),
           useValue: mockModel,
+        },
+        {
+          provide: getModelToken(Orden.name),
+          useValue: mockOrdenModel,
+        },
+        {
+          provide: getModelToken(Resena.name),
+          useValue: mockResenaModel,
+        },
+        {
+          provide: getModelToken(Restaurante.name),
+          useValue: mockRestauranteModel,
         },
       ],
     }).compile();
@@ -278,17 +305,54 @@ describe('UsuariosService', () => {
   // ── remove ──────────────────────────────────────────────────────────────────
 
   describe('remove', () => {
-    it('should delete user and return { deleted: true }', async () => {
+    it('should delete user and return { deleted: true } when no associated data', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockResenaModel.countDocuments.mockResolvedValue(0);
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
       const query = createMockQuery({ _id: 'u1' });
       mockModel.findByIdAndDelete.mockReturnValue(query);
 
       const result = await service.remove('u1');
 
+      expect(mockOrdenModel.countDocuments).toHaveBeenCalledWith({ usuario_id: 'u1' });
+      expect(mockResenaModel.countDocuments).toHaveBeenCalledWith({ usuario_id: 'u1' });
+      expect(mockRestauranteModel.countDocuments).toHaveBeenCalledWith({ propietario_id: 'u1' });
       expect(mockModel.findByIdAndDelete).toHaveBeenCalledWith('u1');
       expect(result).toEqual({ deleted: true });
     });
 
+    it('should throw BadRequestException when user has associated ordenes', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(3);
+      mockResenaModel.countDocuments.mockResolvedValue(0);
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
+
+      await expect(service.remove('u1')).rejects.toThrow(BadRequestException);
+      await expect(service.remove('u1')).rejects.toThrow('orden(es)');
+      expect(mockModel.findByIdAndDelete).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when user has associated resenas', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockResenaModel.countDocuments.mockResolvedValue(5);
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
+
+      await expect(service.remove('u1')).rejects.toThrow(BadRequestException);
+      await expect(service.remove('u1')).rejects.toThrow('reseña(s)');
+    });
+
+    it('should throw BadRequestException when user has associated restaurantes', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockResenaModel.countDocuments.mockResolvedValue(0);
+      mockRestauranteModel.countDocuments.mockResolvedValue(2);
+
+      await expect(service.remove('u1')).rejects.toThrow(BadRequestException);
+      await expect(service.remove('u1')).rejects.toThrow('restaurante(s)');
+    });
+
     it('should throw NotFoundException when user to delete is not found', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockResenaModel.countDocuments.mockResolvedValue(0);
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
       const query = createMockQuery(null);
       mockModel.findByIdAndDelete.mockReturnValue(query);
 

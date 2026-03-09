@@ -152,48 +152,72 @@ export class OrdenesService {
         }
 
         const updated = await this.ordenModel
-            .findByIdAndUpdate(id, update, { new: true })
+            .findOneAndUpdate(
+                { _id: id, estado: (orden as any).estado },
+                update,
+                { new: true },
+            )
             .exec();
-        if (!updated) throw new NotFoundException('Orden no encontrada');
+        if (!updated) throw new BadRequestException('Conflicto: el estado de la orden cambió entre lectura y escritura (reintente)');
         return updated;
     }
 
     async remove(id: string): Promise<{ deleted: boolean }> {
-        const orden = await this.ordenModel.findByIdAndDelete(id).exec();
-        if (!orden) throw new NotFoundException('Orden no encontrada');
+        const session = await this.connection.startSession();
+        session.startTransaction();
+        try {
+            const orden = await this.ordenModel.findByIdAndDelete(id, { session }).exec();
+            if (!orden) throw new NotFoundException('Orden no encontrada');
 
-        // Decrementar veces_ordenado en cada menu_item
-        const bulkOps = (orden.items || []).map((item: any) => ({
-            updateOne: {
-                filter: { _id: item.item_id || item.menu_item_id },
-                update: { $inc: { veces_ordenado: -(item.cantidad || 0) } },
-            },
-        }));
-        if (bulkOps.length) {
-            await this.menuItemModel.bulkWrite(bulkOps as any[]);
-        }
-
-        return { deleted: true };
-    }
-
-    async removeMany(ids: string[]): Promise<{ deleted: number }> {
-        const ordenes = await this.ordenModel.find({ _id: { $in: ids } }).select('items').lean().exec();
-
-        const result = await this.ordenModel.deleteMany({ _id: { $in: ids } }).exec();
-
-        // Decrementar veces_ordenado para todas las órdenes eliminadas
-        const bulkOps = ordenes.flatMap((orden: any) =>
-            (orden.items || []).map((item: any) => ({
+            // Decrementar veces_ordenado en cada menu_item
+            const bulkOps = (orden.items || []).map((item: any) => ({
                 updateOne: {
                     filter: { _id: item.item_id || item.menu_item_id },
                     update: { $inc: { veces_ordenado: -(item.cantidad || 0) } },
                 },
-            })),
-        );
-        if (bulkOps.length) {
-            await this.menuItemModel.bulkWrite(bulkOps as any[]);
-        }
+            }));
+            if (bulkOps.length) {
+                await this.menuItemModel.bulkWrite(bulkOps as any[], { session } as any);
+            }
 
-        return { deleted: result.deletedCount };
+            await session.commitTransaction();
+            return { deleted: true };
+        } catch (err) {
+            await session.abortTransaction();
+            throw err;
+        } finally {
+            await session.endSession();
+        }
+    }
+
+    async removeMany(ids: string[]): Promise<{ deleted: number }> {
+        const session = await this.connection.startSession();
+        session.startTransaction();
+        try {
+            const ordenes = await this.ordenModel.find({ _id: { $in: ids } }).select('items').lean().session(session).exec();
+
+            const result = await this.ordenModel.deleteMany({ _id: { $in: ids } }).session(session).exec();
+
+            // Decrementar veces_ordenado para todas las órdenes eliminadas
+            const bulkOps = ordenes.flatMap((orden: any) =>
+                (orden.items || []).map((item: any) => ({
+                    updateOne: {
+                        filter: { _id: item.item_id || item.menu_item_id },
+                        update: { $inc: { veces_ordenado: -(item.cantidad || 0) } },
+                    },
+                })),
+            );
+            if (bulkOps.length) {
+                await this.menuItemModel.bulkWrite(bulkOps as any[], { session } as any);
+            }
+
+            await session.commitTransaction();
+            return { deleted: result.deletedCount };
+        } catch (err) {
+            await session.abortTransaction();
+            throw err;
+        } finally {
+            await session.endSession();
+        }
     }
 }

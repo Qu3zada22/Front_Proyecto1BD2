@@ -39,6 +39,7 @@ const mockOrdenModel = {
   findById: jest.fn(),
   findByIdAndUpdate: jest.fn(),
   findByIdAndDelete: jest.fn(),
+  findOneAndUpdate: jest.fn(),
   findOne: jest.fn(),
   updateMany: jest.fn(),
   deleteMany: jest.fn(),
@@ -327,12 +328,12 @@ describe('OrdenesService', () => {
       mockOrdenModel.findById.mockReturnValue(findQuery);
       const updated = { _id: 'o1', estado: 'en_proceso' };
       const query = createMockQuery(updated);
-      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
+      mockOrdenModel.findOneAndUpdate.mockReturnValue(query);
 
       const result = await service.updateStatus('o1', 'en_proceso');
 
-      const [id, update, opts] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
-      expect(id).toBe('o1');
+      const [filter, update, opts] = mockOrdenModel.findOneAndUpdate.mock.calls[0];
+      expect(filter).toEqual({ _id: 'o1', estado: 'pendiente' });
       expect(update.$set.estado).toBe('en_proceso');
       // $each + $slice:-5 para mantener array acotado en máximo 5 entradas (diseño)
       expect(update.$push.historial_estados.$each[0]).toMatchObject({ estado: 'en_proceso' });
@@ -346,11 +347,11 @@ describe('OrdenesService', () => {
       const findQuery = createMockQuery({ _id: 'o1', estado: 'en_camino' });
       mockOrdenModel.findById.mockReturnValue(findQuery);
       const query = createMockQuery({ _id: 'o1', estado: 'entregado' });
-      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
+      mockOrdenModel.findOneAndUpdate.mockReturnValue(query);
 
       await service.updateStatus('o1', 'entregado');
 
-      const [, update] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
+      const [, update] = mockOrdenModel.findOneAndUpdate.mock.calls[0];
       expect(update.$set.fecha_entrega_real).toBeInstanceOf(Date);
     });
 
@@ -358,11 +359,11 @@ describe('OrdenesService', () => {
       const findQuery = createMockQuery({ _id: 'o1', estado: 'en_proceso' });
       mockOrdenModel.findById.mockReturnValue(findQuery);
       const query = createMockQuery({ _id: 'o1', estado: 'en_camino' });
-      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
+      mockOrdenModel.findOneAndUpdate.mockReturnValue(query);
 
       await service.updateStatus('o1', 'en_camino');
 
-      const [, update] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
+      const [, update] = mockOrdenModel.findOneAndUpdate.mock.calls[0];
       expect(update.$set.fecha_entrega_real).toBeUndefined();
     });
 
@@ -371,11 +372,11 @@ describe('OrdenesService', () => {
       const findQuery = createMockQuery({ _id: 'o1', estado: 'pendiente' });
       mockOrdenModel.findById.mockReturnValue(findQuery);
       const query = createMockQuery({ _id: 'o1', estado: 'en_proceso' });
-      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
+      mockOrdenModel.findOneAndUpdate.mockReturnValue(query);
 
       await service.updateStatus('o1', 'en_proceso', actorId);
 
-      const [, update] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
+      const [, update] = mockOrdenModel.findOneAndUpdate.mock.calls[0];
       expect(update.$push.historial_estados.$each[0].actor_id).toBeInstanceOf(Types.ObjectId);
       expect(update.$push.historial_estados.$each[0].actor_id.toString()).toBe(actorId);
     });
@@ -384,11 +385,11 @@ describe('OrdenesService', () => {
       const findQuery = createMockQuery({ _id: 'o1', estado: 'pendiente' });
       mockOrdenModel.findById.mockReturnValue(findQuery);
       const query = createMockQuery({ _id: 'o1', estado: 'cancelado' });
-      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
+      mockOrdenModel.findOneAndUpdate.mockReturnValue(query);
 
       await service.updateStatus('o1', 'cancelado', undefined, 'Cliente canceló');
 
-      const [, update] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
+      const [, update] = mockOrdenModel.findOneAndUpdate.mock.calls[0];
       expect(update.$push.historial_estados.$each[0].nota).toBe('Cliente canceló');
     });
 
@@ -405,7 +406,7 @@ describe('OrdenesService', () => {
         const findQuery = createMockQuery({ _id: 'o1', estado: from });
         mockOrdenModel.findById.mockReturnValue(findQuery);
         const query = createMockQuery({ _id: 'o1', estado: to });
-        mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
+        mockOrdenModel.findOneAndUpdate.mockReturnValue(query);
 
         const result = await service.updateStatus('o1', to);
         expect(result).toEqual({ _id: 'o1', estado: to });
@@ -446,12 +447,23 @@ describe('OrdenesService', () => {
         'Orden no encontrada',
       );
     });
+
+    it('should throw BadRequestException when estado changed between read and write (race condition)', async () => {
+      const findQuery = createMockQuery({ _id: 'o1', estado: 'pendiente' });
+      mockOrdenModel.findById.mockReturnValue(findQuery);
+      // findOneAndUpdate returns null → estado changed concurrently
+      const query = createMockQuery(null);
+      mockOrdenModel.findOneAndUpdate.mockReturnValue(query);
+
+      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow(BadRequestException);
+      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow('Conflicto');
+    });
   });
 
   // ── remove ──────────────────────────────────────────────────────────────────
 
   describe('remove', () => {
-    it('should delete orden, decrement veces_ordenado via bulkWrite, and return { deleted: true }', async () => {
+    it('should delete orden inside ACID transaction, decrement veces_ordenado via bulkWrite, and return { deleted: true }', async () => {
       const ordenDoc = {
         _id: 'o1',
         items: [
@@ -465,12 +477,17 @@ describe('OrdenesService', () => {
 
       const result = await service.remove('o1');
 
-      expect(mockOrdenModel.findByIdAndDelete).toHaveBeenCalledWith('o1');
+      expect(mockConnection.startSession).toHaveBeenCalled();
+      expect(mockSession.startTransaction).toHaveBeenCalled();
+      expect(mockOrdenModel.findByIdAndDelete).toHaveBeenCalledWith('o1', { session: mockSession });
       expect(mockMenuItemModel.bulkWrite).toHaveBeenCalledTimes(1);
-      const [bulkOps] = mockMenuItemModel.bulkWrite.mock.calls[0];
+      const [bulkOps, opts] = mockMenuItemModel.bulkWrite.mock.calls[0];
       expect(bulkOps).toHaveLength(2);
       expect(bulkOps[0].updateOne.update).toEqual({ $inc: { veces_ordenado: -2 } });
       expect(bulkOps[1].updateOne.update).toEqual({ $inc: { veces_ordenado: -1 } });
+      expect(opts).toMatchObject({ session: mockSession });
+      expect(mockSession.commitTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
       expect(result).toEqual({ deleted: true });
     });
 
@@ -480,40 +497,51 @@ describe('OrdenesService', () => {
 
       await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
       await expect(service.remove('nonexistent')).rejects.toThrow('Orden no encontrada');
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
     });
   });
 
   // ── removeMany ───────────────────────────────────────────────────────────────
 
   describe('removeMany', () => {
-    it('should delete multiple ordenes, decrement veces_ordenado, and return deleted count', async () => {
+    it('should delete multiple ordenes inside ACID transaction, decrement veces_ordenado, and return deleted count', async () => {
       const ids = ['o1', 'o2'];
       const ordenes = [
         { _id: 'o1', items: [{ item_id: 'i1', cantidad: 3 }] },
         { _id: 'o2', items: [{ item_id: 'i2', cantidad: 1 }] },
       ];
       const findQuery = createMockQuery(ordenes);
+      findQuery.session = jest.fn().mockReturnThis();
       mockOrdenModel.find.mockReturnValue(findQuery);
       const deleteQuery = createMockQuery({ deletedCount: 2 });
+      deleteQuery.session = jest.fn().mockReturnThis();
       mockOrdenModel.deleteMany.mockReturnValue(deleteQuery);
       mockMenuItemModel.bulkWrite.mockResolvedValue({});
 
       const result = await service.removeMany(ids);
 
+      expect(mockConnection.startSession).toHaveBeenCalled();
+      expect(mockSession.startTransaction).toHaveBeenCalled();
       expect(mockOrdenModel.deleteMany).toHaveBeenCalledWith({ _id: { $in: ids } });
       expect(mockMenuItemModel.bulkWrite).toHaveBeenCalledTimes(1);
-      const [bulkOps] = mockMenuItemModel.bulkWrite.mock.calls[0];
+      const [bulkOps, opts] = mockMenuItemModel.bulkWrite.mock.calls[0];
       expect(bulkOps).toHaveLength(2);
       expect(bulkOps[0].updateOne.update).toEqual({ $inc: { veces_ordenado: -3 } });
       expect(bulkOps[1].updateOne.update).toEqual({ $inc: { veces_ordenado: -1 } });
+      expect(opts).toMatchObject({ session: mockSession });
+      expect(mockSession.commitTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
       expect(result).toEqual({ deleted: 2 });
     });
 
     it('should return deleted: 0 when no ordenes matched', async () => {
       const findQuery = createMockQuery([]);
+      findQuery.session = jest.fn().mockReturnThis();
       mockOrdenModel.find.mockReturnValue(findQuery);
       const execResult = { deletedCount: 0 };
       const query = createMockQuery(execResult);
+      query.session = jest.fn().mockReturnThis();
       mockOrdenModel.deleteMany.mockReturnValue(query);
 
       const result = await service.removeMany(['nonexistent']);

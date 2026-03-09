@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ReportesService } from './reportes.service';
 
@@ -56,6 +56,9 @@ export class ReportesController {
     ingresosPorDia(@Query('desde') desde: string, @Query('hasta') hasta: string) {
         const start = desde ?? '2023-01-01';
         const end = hasta ?? '2025-12-31';
+        if (isNaN(Date.parse(start)) || isNaN(Date.parse(end))) {
+            throw new BadRequestException('Formato de fecha inválido. Use formato ISO (YYYY-MM-DD)');
+        }
         return this.reportesService.ingresosPorDia(start, end);
     }
 
