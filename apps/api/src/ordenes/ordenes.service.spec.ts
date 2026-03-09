@@ -44,11 +44,13 @@ const mockOrdenModel = {
   deleteMany: jest.fn(),
   aggregate: jest.fn(),
   distinct: jest.fn(),
+  countDocuments: jest.fn(),
 };
 
 const mockMenuItemModel = {
   find: jest.fn(),
   bulkWrite: jest.fn(),
+  countDocuments: jest.fn(),
 };
 
 // ── suite ─────────────────────────────────────────────────────────────────────
@@ -321,6 +323,8 @@ describe('OrdenesService', () => {
 
   describe('updateStatus', () => {
     it('should update with $set estado AND $push to historial_estados with $slice:-5', async () => {
+      const findQuery = createMockQuery({ _id: 'o1', estado: 'pendiente' });
+      mockOrdenModel.findById.mockReturnValue(findQuery);
       const updated = { _id: 'o1', estado: 'en_proceso' };
       const query = createMockQuery(updated);
       mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
@@ -339,6 +343,8 @@ describe('OrdenesService', () => {
     });
 
     it('should set fecha_entrega_real when estado is "entregado"', async () => {
+      const findQuery = createMockQuery({ _id: 'o1', estado: 'en_camino' });
+      mockOrdenModel.findById.mockReturnValue(findQuery);
       const query = createMockQuery({ _id: 'o1', estado: 'entregado' });
       mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
 
@@ -349,6 +355,8 @@ describe('OrdenesService', () => {
     });
 
     it('should NOT set fecha_entrega_real for non-entregado states', async () => {
+      const findQuery = createMockQuery({ _id: 'o1', estado: 'en_proceso' });
+      mockOrdenModel.findById.mockReturnValue(findQuery);
       const query = createMockQuery({ _id: 'o1', estado: 'en_camino' });
       mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
 
@@ -360,6 +368,8 @@ describe('OrdenesService', () => {
 
     it('should include actor_id in historial entry when provided', async () => {
       const actorId = '507f1f77bcf86cd799439099';
+      const findQuery = createMockQuery({ _id: 'o1', estado: 'pendiente' });
+      mockOrdenModel.findById.mockReturnValue(findQuery);
       const query = createMockQuery({ _id: 'o1', estado: 'en_proceso' });
       mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
 
@@ -371,6 +381,8 @@ describe('OrdenesService', () => {
     });
 
     it('should include nota in historial entry when provided', async () => {
+      const findQuery = createMockQuery({ _id: 'o1', estado: 'pendiente' });
+      mockOrdenModel.findById.mockReturnValue(findQuery);
       const query = createMockQuery({ _id: 'o1', estado: 'cancelado' });
       mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
 
@@ -380,16 +392,23 @@ describe('OrdenesService', () => {
       expect(update.$push.historial_estados.$each[0].nota).toBe('Cliente canceló');
     });
 
-    it('should accept all valid estado values including en_proceso', async () => {
-      const validStates = ['pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado'];
+    it('should accept valid forward transitions', async () => {
+      const transitions = [
+        { from: 'pendiente', to: 'en_proceso' },
+        { from: 'en_proceso', to: 'en_camino' },
+        { from: 'en_camino', to: 'entregado' },
+        { from: 'pendiente', to: 'cancelado' },
+      ];
 
-      for (const estado of validStates) {
+      for (const { from, to } of transitions) {
         jest.clearAllMocks();
-        const query = createMockQuery({ _id: 'o1', estado });
+        const findQuery = createMockQuery({ _id: 'o1', estado: from });
+        mockOrdenModel.findById.mockReturnValue(findQuery);
+        const query = createMockQuery({ _id: 'o1', estado: to });
         mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
 
-        const result = await service.updateStatus('o1', estado);
-        expect(result).toEqual({ _id: 'o1', estado });
+        const result = await service.updateStatus('o1', to);
+        expect(result).toEqual({ _id: 'o1', estado: to });
       }
     });
 
@@ -400,9 +419,25 @@ describe('OrdenesService', () => {
       await expect(service.updateStatus('o1', 'invalid_state')).rejects.toThrow('Estado inválido');
     });
 
+    it('should throw BadRequestException for invalid backward transitions', async () => {
+      const findQuery = createMockQuery({ _id: 'o1', estado: 'entregado' });
+      mockOrdenModel.findById.mockReturnValue(findQuery);
+
+      await expect(service.updateStatus('o1', 'pendiente')).rejects.toThrow(BadRequestException);
+      await expect(service.updateStatus('o1', 'pendiente')).rejects.toThrow('Transición inválida');
+    });
+
+    it('should throw BadRequestException when transitioning from terminal state cancelado', async () => {
+      const findQuery = createMockQuery({ _id: 'o1', estado: 'cancelado' });
+      mockOrdenModel.findById.mockReturnValue(findQuery);
+
+      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow(BadRequestException);
+      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow('Transición inválida');
+    });
+
     it('should throw NotFoundException when orden to update is not found', async () => {
-      const query = createMockQuery(null);
-      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
+      const findQuery = createMockQuery(null);
+      mockOrdenModel.findById.mockReturnValue(findQuery);
 
       await expect(service.updateStatus('nonexistent', 'en_proceso')).rejects.toThrow(
         NotFoundException,
@@ -416,13 +451,26 @@ describe('OrdenesService', () => {
   // ── remove ──────────────────────────────────────────────────────────────────
 
   describe('remove', () => {
-    it('should delete orden and return { deleted: true }', async () => {
-      const query = createMockQuery({ _id: 'o1' });
+    it('should delete orden, decrement veces_ordenado via bulkWrite, and return { deleted: true }', async () => {
+      const ordenDoc = {
+        _id: 'o1',
+        items: [
+          { item_id: '507f1f77bcf86cd799439031', cantidad: 2 },
+          { item_id: '507f1f77bcf86cd799439032', cantidad: 1 },
+        ],
+      };
+      const query = createMockQuery(ordenDoc);
       mockOrdenModel.findByIdAndDelete.mockReturnValue(query);
+      mockMenuItemModel.bulkWrite.mockResolvedValue({});
 
       const result = await service.remove('o1');
 
       expect(mockOrdenModel.findByIdAndDelete).toHaveBeenCalledWith('o1');
+      expect(mockMenuItemModel.bulkWrite).toHaveBeenCalledTimes(1);
+      const [bulkOps] = mockMenuItemModel.bulkWrite.mock.calls[0];
+      expect(bulkOps).toHaveLength(2);
+      expect(bulkOps[0].updateOne.update).toEqual({ $inc: { veces_ordenado: -2 } });
+      expect(bulkOps[1].updateOne.update).toEqual({ $inc: { veces_ordenado: -1 } });
       expect(result).toEqual({ deleted: true });
     });
 
@@ -438,19 +486,32 @@ describe('OrdenesService', () => {
   // ── removeMany ───────────────────────────────────────────────────────────────
 
   describe('removeMany', () => {
-    it('should delete multiple ordenes by ids and return deleted count', async () => {
-      const ids = ['o1', 'o2', 'o3'];
-      const execResult = { deletedCount: 3 };
-      const query = createMockQuery(execResult);
-      mockOrdenModel.deleteMany.mockReturnValue(query);
+    it('should delete multiple ordenes, decrement veces_ordenado, and return deleted count', async () => {
+      const ids = ['o1', 'o2'];
+      const ordenes = [
+        { _id: 'o1', items: [{ item_id: 'i1', cantidad: 3 }] },
+        { _id: 'o2', items: [{ item_id: 'i2', cantidad: 1 }] },
+      ];
+      const findQuery = createMockQuery(ordenes);
+      mockOrdenModel.find.mockReturnValue(findQuery);
+      const deleteQuery = createMockQuery({ deletedCount: 2 });
+      mockOrdenModel.deleteMany.mockReturnValue(deleteQuery);
+      mockMenuItemModel.bulkWrite.mockResolvedValue({});
 
       const result = await service.removeMany(ids);
 
       expect(mockOrdenModel.deleteMany).toHaveBeenCalledWith({ _id: { $in: ids } });
-      expect(result).toEqual({ deleted: 3 });
+      expect(mockMenuItemModel.bulkWrite).toHaveBeenCalledTimes(1);
+      const [bulkOps] = mockMenuItemModel.bulkWrite.mock.calls[0];
+      expect(bulkOps).toHaveLength(2);
+      expect(bulkOps[0].updateOne.update).toEqual({ $inc: { veces_ordenado: -3 } });
+      expect(bulkOps[1].updateOne.update).toEqual({ $inc: { veces_ordenado: -1 } });
+      expect(result).toEqual({ deleted: 2 });
     });
 
     it('should return deleted: 0 when no ordenes matched', async () => {
+      const findQuery = createMockQuery([]);
+      mockOrdenModel.find.mockReturnValue(findQuery);
       const execResult = { deletedCount: 0 };
       const query = createMockQuery(execResult);
       mockOrdenModel.deleteMany.mockReturnValue(query);

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RestaurantesService } from './restaurantes.service';
 import { Restaurante } from './schemas/restaurante.schema';
 import { MenuItem } from '../menu-items/schemas/menu-item.schema';
@@ -47,10 +47,12 @@ const mockModel = {
 
 const mockMenuItemModel = {
   updateMany: jest.fn(),
+  countDocuments: jest.fn(),
 };
 
 const mockOrdenModel = {
   updateMany: jest.fn(),
+  countDocuments: jest.fn(),
 };
 
 // ── suite ─────────────────────────────────────────────────────────────────────
@@ -255,17 +257,38 @@ describe('RestaurantesService', () => {
   // ── remove ──────────────────────────────────────────────────────────────────
 
   describe('remove', () => {
-    it('should delete and return { deleted: true }', async () => {
+    it('should delete when no associated data exists', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockMenuItemModel.countDocuments.mockResolvedValue(0);
       const query = createMockQuery({ _id: 'abc' });
       mockModel.findByIdAndDelete.mockReturnValue(query);
 
       const result = await service.remove('abc');
 
+      expect(mockOrdenModel.countDocuments).toHaveBeenCalledWith({ restaurante_id: 'abc' });
+      expect(mockMenuItemModel.countDocuments).toHaveBeenCalledWith({ restaurante_id: 'abc' });
       expect(mockModel.findByIdAndDelete).toHaveBeenCalledWith('abc');
       expect(result).toEqual({ deleted: true });
     });
 
+    it('should throw BadRequestException when restaurante has associated ordenes', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(3);
+      mockMenuItemModel.countDocuments.mockResolvedValue(0);
+
+      await expect(service.remove('abc')).rejects.toThrow(BadRequestException);
+      await expect(service.remove('abc')).rejects.toThrow('No se puede eliminar');
+    });
+
+    it('should throw BadRequestException when restaurante has associated menu items', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockMenuItemModel.countDocuments.mockResolvedValue(5);
+
+      await expect(service.remove('abc')).rejects.toThrow(BadRequestException);
+    });
+
     it('should throw NotFoundException when restaurante to delete is not found', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockMenuItemModel.countDocuments.mockResolvedValue(0);
       const query = createMockQuery(null);
       mockModel.findByIdAndDelete.mockReturnValue(query);
 

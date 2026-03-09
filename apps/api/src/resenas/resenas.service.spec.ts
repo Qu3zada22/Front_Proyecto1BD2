@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getModelToken } from '@nestjs/mongoose';
+import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
 import { NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { ResenasService } from './resenas.service';
@@ -22,13 +22,28 @@ function createMockQuery(resolvedValue: any) {
   return query;
 }
 
+const mockSession = {
+  startTransaction: jest.fn(),
+  commitTransaction: jest.fn(),
+  abortTransaction: jest.fn(),
+  endSession: jest.fn(),
+};
+
+const mockConnection = {
+  startSession: jest.fn().mockResolvedValue(mockSession),
+};
+
+const mockAggregateChain = {
+  session: jest.fn().mockResolvedValue([{ avg: 4.5, count: 10 }]),
+};
+
 const mockResenaModel = {
   create: jest.fn(),
   find: jest.fn(),
   findById: jest.fn(),
   findByIdAndUpdate: jest.fn(),
   findByIdAndDelete: jest.fn(),
-  aggregate: jest.fn(),
+  aggregate: jest.fn().mockReturnValue(mockAggregateChain),
 };
 
 const mockRestauranteModel = {
@@ -46,8 +61,11 @@ describe('ResenasService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockConnection.startSession.mockResolvedValue(mockSession);
     mockRestauranteModel.findByIdAndUpdate.mockResolvedValue({});
     mockOrdenModel.findByIdAndUpdate.mockResolvedValue({});
+    mockAggregateChain.session.mockResolvedValue([{ avg: 4.5, count: 10 }]);
+    mockResenaModel.aggregate.mockReturnValue(mockAggregateChain);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -55,6 +73,7 @@ describe('ResenasService', () => {
         { provide: getModelToken(Resena.name), useValue: mockResenaModel },
         { provide: getModelToken(Restaurante.name), useValue: mockRestauranteModel },
         { provide: getModelToken(Orden.name), useValue: mockOrdenModel },
+        { provide: getConnectionToken(), useValue: mockConnection },
       ],
     }).compile();
 
@@ -67,22 +86,35 @@ describe('ResenasService', () => {
     const restauranteId = new Types.ObjectId().toString();
     const ordenId = new Types.ObjectId().toString();
 
-    it('should call model.create with the provided data and return the result', async () => {
+    it('should start a transaction and commit on success', async () => {
       const data = { usuario_id: new Types.ObjectId().toString(), restaurante_id: restauranteId, calificacion: 5 };
       const created = { _id: 'r1', ...data };
-      mockResenaModel.create.mockResolvedValue(created);
-      mockResenaModel.aggregate.mockResolvedValue([{ avg: 5, count: 1 }]);
+      mockResenaModel.create.mockResolvedValue([created]);
+
+      await service.create(data);
+
+      expect(mockConnection.startSession).toHaveBeenCalled();
+      expect(mockSession.startTransaction).toHaveBeenCalled();
+      expect(mockSession.commitTransaction).toHaveBeenCalled();
+      expect(mockSession.abortTransaction).not.toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
+    });
+
+    it('should call model.create with array syntax and session for ACID transaction', async () => {
+      const data = { usuario_id: new Types.ObjectId().toString(), restaurante_id: restauranteId, calificacion: 5 };
+      const created = { _id: 'r1', ...data };
+      mockResenaModel.create.mockResolvedValue([created]);
 
       const result = await service.create(data);
 
-      expect(mockResenaModel.create).toHaveBeenCalledWith(data);
+      expect(mockResenaModel.create).toHaveBeenCalledWith([data], { session: mockSession });
       expect(result).toEqual(created);
     });
 
     it('should update calificacion_prom and total_resenas on the restaurante after create', async () => {
       const data = { usuario_id: 'u1', restaurante_id: restauranteId, calificacion: 4 };
-      mockResenaModel.create.mockResolvedValue({ _id: 'r1', ...data });
-      mockResenaModel.aggregate.mockResolvedValue([{ avg: 4.2, count: 10 }]);
+      mockResenaModel.create.mockResolvedValue([{ _id: 'r1', ...data }]);
+      mockAggregateChain.session.mockResolvedValue([{ avg: 4.2, count: 10 }]);
 
       await service.create(data);
 
@@ -90,25 +122,26 @@ describe('ResenasService', () => {
       expect(mockRestauranteModel.findByIdAndUpdate).toHaveBeenCalledWith(
         restauranteId,
         expect.objectContaining({ $set: expect.objectContaining({ calificacion_prom: 4.2, total_resenas: 10 }) }),
+        { session: mockSession },
       );
     });
 
     it('should update tiene_resena on the orden when orden_id is provided', async () => {
       const data = { usuario_id: 'u1', restaurante_id: restauranteId, orden_id: ordenId, calificacion: 5 };
-      mockResenaModel.create.mockResolvedValue({ _id: 'r1', ...data });
-      mockResenaModel.aggregate.mockResolvedValue([{ avg: 5, count: 1 }]);
+      mockResenaModel.create.mockResolvedValue([{ _id: 'r1', ...data }]);
 
       await service.create(data);
 
       expect(mockOrdenModel.findByIdAndUpdate).toHaveBeenCalledWith(
         ordenId,
         { $set: { tiene_resena: true } },
+        { session: mockSession },
       );
     });
 
     it('should NOT update restaurante when restaurante_id is absent', async () => {
       const data = { usuario_id: 'u1', calificacion: 3 };
-      mockResenaModel.create.mockResolvedValue({ _id: 'r1', ...data });
+      mockResenaModel.create.mockResolvedValue([{ _id: 'r1', ...data }]);
 
       await service.create(data);
 
@@ -117,12 +150,27 @@ describe('ResenasService', () => {
 
     it('should NOT update orden when orden_id is absent', async () => {
       const data = { usuario_id: 'u1', restaurante_id: restauranteId, calificacion: 3 };
-      mockResenaModel.create.mockResolvedValue({ _id: 'r1', ...data });
-      mockResenaModel.aggregate.mockResolvedValue([{ avg: 3, count: 5 }]);
+      mockResenaModel.create.mockResolvedValue([{ _id: 'r1', ...data }]);
 
       await service.create(data);
 
       expect(mockOrdenModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should abort transaction and rethrow on error', async () => {
+      mockResenaModel.create.mockRejectedValue(new Error('DB error'));
+
+      await expect(service.create({ usuario_id: 'u1', calificacion: 3 })).rejects.toThrow('DB error');
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
+    });
+
+    it('should always call endSession even when an error occurs', async () => {
+      mockResenaModel.create.mockRejectedValue(new Error('failure'));
+
+      try { await service.create({ usuario_id: 'u1' }); } catch { /* expected */ }
+
+      expect(mockSession.endSession).toHaveBeenCalled();
     });
   });
 
@@ -303,14 +351,76 @@ describe('ResenasService', () => {
   // ── remove ──────────────────────────────────────────────────────────────────
 
   describe('remove', () => {
+    const restauranteOid = new Types.ObjectId();
+    const ordenOid = new Types.ObjectId();
+
     it('should delete resena and return { deleted: true }', async () => {
-      const query = createMockQuery({ _id: 'r1' });
+      const query = createMockQuery({ _id: 'r1', restaurante_id: restauranteOid, orden_id: ordenOid });
       mockResenaModel.findByIdAndDelete.mockReturnValue(query);
+      mockResenaModel.aggregate.mockResolvedValue([{ avg: 4.0, count: 9 }]);
 
       const result = await service.remove('r1');
 
       expect(mockResenaModel.findByIdAndDelete).toHaveBeenCalledWith('r1');
       expect(result).toEqual({ deleted: true });
+    });
+
+    it('should recalculate calificacion_prom and total_resenas on restaurante after delete', async () => {
+      const query = createMockQuery({ _id: 'r1', restaurante_id: restauranteOid });
+      mockResenaModel.findByIdAndDelete.mockReturnValue(query);
+      mockResenaModel.aggregate.mockResolvedValue([{ avg: 3.5, count: 4 }]);
+
+      await service.remove('r1');
+
+      expect(mockResenaModel.aggregate).toHaveBeenCalled();
+      expect(mockRestauranteModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        restauranteOid,
+        { $set: { calificacion_prom: 3.5, total_resenas: 4 } },
+      );
+    });
+
+    it('should reset calificacion_prom to 0 when no reviews remain', async () => {
+      const query = createMockQuery({ _id: 'r1', restaurante_id: restauranteOid });
+      mockResenaModel.findByIdAndDelete.mockReturnValue(query);
+      mockResenaModel.aggregate.mockResolvedValue([]);
+
+      await service.remove('r1');
+
+      expect(mockRestauranteModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        restauranteOid,
+        { $set: { calificacion_prom: 0, total_resenas: 0 } },
+      );
+    });
+
+    it('should reset tiene_resena to false on the orden after delete', async () => {
+      const query = createMockQuery({ _id: 'r1', orden_id: ordenOid });
+      mockResenaModel.findByIdAndDelete.mockReturnValue(query);
+
+      await service.remove('r1');
+
+      expect(mockOrdenModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        ordenOid,
+        { $set: { tiene_resena: false } },
+      );
+    });
+
+    it('should NOT update restaurante when resena had no restaurante_id', async () => {
+      const query = createMockQuery({ _id: 'r1' });
+      mockResenaModel.findByIdAndDelete.mockReturnValue(query);
+
+      await service.remove('r1');
+
+      expect(mockRestauranteModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should NOT update orden when resena had no orden_id', async () => {
+      const query = createMockQuery({ _id: 'r1', restaurante_id: restauranteOid });
+      mockResenaModel.findByIdAndDelete.mockReturnValue(query);
+      mockResenaModel.aggregate.mockResolvedValue([{ avg: 4.0, count: 5 }]);
+
+      await service.remove('r1');
+
+      expect(mockOrdenModel.findByIdAndUpdate).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when resena is not found', async () => {

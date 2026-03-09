@@ -9,6 +9,14 @@ const ESTADOS_VALIDOS: EstadoOrden[] = [
     'pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado',
 ];
 
+const TRANSICIONES: Record<string, string[]> = {
+    pendiente: ['en_proceso', 'cancelado'],
+    en_proceso: ['en_camino', 'cancelado'],
+    en_camino: ['entregado', 'cancelado'],
+    entregado: [],
+    cancelado: [],
+};
+
 @Injectable()
 export class OrdenesService {
     constructor(
@@ -116,6 +124,16 @@ export class OrdenesService {
             throw new BadRequestException(`Estado inválido. Válidos: ${ESTADOS_VALIDOS.join(', ')}`);
         }
 
+        // Validar transición legal desde el estado actual
+        const orden = await this.ordenModel.findById(id).select('estado').lean().exec();
+        if (!orden) throw new NotFoundException('Orden no encontrada');
+        const permitidos = TRANSICIONES[(orden as any).estado] ?? [];
+        if (!permitidos.includes(estado)) {
+            throw new BadRequestException(
+                `Transición inválida: ${(orden as any).estado} → ${estado}. Permitidos: ${permitidos.join(', ') || 'ninguno (estado terminal)'}`,
+            );
+        }
+
         const histEntry: any = {
             estado,
             timestamp: new Date(),
@@ -141,13 +159,41 @@ export class OrdenesService {
     }
 
     async remove(id: string): Promise<{ deleted: boolean }> {
-        const result = await this.ordenModel.findByIdAndDelete(id).exec();
-        if (!result) throw new NotFoundException('Orden no encontrada');
+        const orden = await this.ordenModel.findByIdAndDelete(id).exec();
+        if (!orden) throw new NotFoundException('Orden no encontrada');
+
+        // Decrementar veces_ordenado en cada menu_item
+        const bulkOps = (orden.items || []).map((item: any) => ({
+            updateOne: {
+                filter: { _id: item.item_id || item.menu_item_id },
+                update: { $inc: { veces_ordenado: -(item.cantidad || 0) } },
+            },
+        }));
+        if (bulkOps.length) {
+            await this.menuItemModel.bulkWrite(bulkOps as any[]);
+        }
+
         return { deleted: true };
     }
 
     async removeMany(ids: string[]): Promise<{ deleted: number }> {
+        const ordenes = await this.ordenModel.find({ _id: { $in: ids } }).select('items').lean().exec();
+
         const result = await this.ordenModel.deleteMany({ _id: { $in: ids } }).exec();
+
+        // Decrementar veces_ordenado para todas las órdenes eliminadas
+        const bulkOps = ordenes.flatMap((orden: any) =>
+            (orden.items || []).map((item: any) => ({
+                updateOne: {
+                    filter: { _id: item.item_id || item.menu_item_id },
+                    update: { $inc: { veces_ordenado: -(item.cantidad || 0) } },
+                },
+            })),
+        );
+        if (bulkOps.length) {
+            await this.menuItemModel.bulkWrite(bulkOps as any[]);
+        }
+
         return { deleted: result.deletedCount };
     }
 }

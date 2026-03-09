@@ -71,6 +71,21 @@ describe('UsuariosService', () => {
       expect(mockModel.create).toHaveBeenCalledWith(data);
       expect(result).toEqual(created);
     });
+
+    it('should normalize email to lowercase and trim whitespace', async () => {
+      const data = {
+        nombre: 'Ana',
+        email: '  ANA@Example.COM  ',
+        password: 'pw',
+        rol: 'cliente',
+      };
+      mockModel.create.mockResolvedValue({ _id: 'u2', ...data, email: 'ana@example.com' });
+
+      await service.create(data);
+
+      const callArg = mockModel.create.mock.calls[0][0];
+      expect(callArg.email).toBe('ana@example.com');
+    });
   });
 
   // ── findAll ─────────────────────────────────────────────────────────────────
@@ -112,6 +127,17 @@ describe('UsuariosService', () => {
       expect(callArg.email).toBeInstanceOf(RegExp);
       expect(callArg.email.source).toBe('juan');
       expect(callArg.email.flags).toContain('i');
+    });
+
+    it('should escape regex special characters in email filter', async () => {
+      const query = createMockQuery([]);
+      mockModel.find.mockReturnValue(query);
+
+      await service.findAll({ email: 'user+tag@example.com' });
+
+      const callArg = mockModel.find.mock.calls[0][0];
+      expect(callArg.email).toBeInstanceOf(RegExp);
+      expect(callArg.email.source).toBe('user\\+tag@example\\.com');
     });
 
     it('should filter by both rol and email simultaneously', async () => {

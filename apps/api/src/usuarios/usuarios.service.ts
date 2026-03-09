@@ -8,13 +8,19 @@ export class UsuariosService {
     constructor(@InjectModel(Usuario.name) private usuarioModel: Model<UsuarioDocument>) { }
 
     async create(data: any): Promise<UsuarioDocument> {
+        if (data.email) {
+            data.email = data.email.toLowerCase().trim();
+        }
         return this.usuarioModel.create(data);
     }
 
     async findAll(query: { rol?: string; email?: string } = {}): Promise<any[]> {
         const filter: any = {};
         if (query.rol) filter.rol = query.rol;
-        if (query.email) filter.email = new RegExp(query.email, 'i');
+        if (query.email) {
+            const escaped = query.email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            filter.email = new RegExp(escaped, 'i');
+        }
         return this.usuarioModel.find(filter).select('-password').sort({ fecha_registro: -1 }).lean().exec();
     }
 

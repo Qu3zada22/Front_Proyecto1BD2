@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Connection, Model } from 'mongoose';
 import { Restaurante, RestauranteDocument } from './schemas/restaurante.schema';
@@ -78,6 +78,15 @@ export class RestaurantesService {
     }
 
     async remove(id: string): Promise<{ deleted: boolean }> {
+        const [ordenesCount, menuItemsCount] = await Promise.all([
+            this.ordenModel.countDocuments({ restaurante_id: id }),
+            this.menuItemModel.countDocuments({ restaurante_id: id }),
+        ]);
+        if (ordenesCount > 0 || menuItemsCount > 0) {
+            throw new BadRequestException(
+                'No se puede eliminar: el restaurante tiene datos asociados. Usa PATCH :id/cancel en su lugar.',
+            );
+        }
         const result = await this.restauranteModel.findByIdAndDelete(id).exec();
         if (!result) throw new NotFoundException('Restaurante no encontrado');
         return { deleted: true };
