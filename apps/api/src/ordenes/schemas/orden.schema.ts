@@ -4,6 +4,7 @@ import { HydratedDocument, Types } from 'mongoose';
 export type EstadoOrden =
     | 'pendiente'
     | 'confirmado'
+    | 'en_proceso'   // alias usado por seed
     | 'en_camino'
     | 'entregado'
     | 'cancelado';
@@ -65,7 +66,7 @@ export class Orden {
 
     @Prop({
         type: String,
-        enum: ['pendiente', 'confirmado', 'en_camino', 'entregado', 'cancelado'],
+        enum: ['pendiente', 'confirmado', 'en_proceso', 'en_camino', 'entregado', 'cancelado'],
         default: 'pendiente',
     })
     estado: EstadoOrden;

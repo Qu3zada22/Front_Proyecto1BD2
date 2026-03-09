@@ -21,7 +21,7 @@ export class ResenasService {
             sort === 'fecha' ? { fecha: -1 } : { calificacion: -1 };
         return this.resenaModel
             .find({ restaurante_id: new Types.ObjectId(restauranteId), activa: true })
-            .populate('cliente_id', 'nombre')
+            .populate('usuario_id', 'nombre')
             .sort(sortField)
             .skip(skip)
             .limit(limit)

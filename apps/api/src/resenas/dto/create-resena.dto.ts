@@ -2,8 +2,8 @@ import { IsString, IsNumber, IsOptional, IsArray, Min, Max } from 'class-validat
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateResenaDto {
-    @ApiProperty({ example: '64a1b2c3d4e5f6a7b8c9d0e1', description: 'ID del cliente' })
-    @IsString() cliente_id: string;
+    @ApiProperty({ example: '64a1b2c3d4e5f6a7b8c9d0e1', description: 'ID del usuario' })
+    @IsString() usuario_id: string;
 
     @ApiPropertyOptional({ example: '64a1b2c3d4e5f6a7b8c9d0e2', description: 'ID del restaurante' })
     @IsOptional() @IsString() restaurante_id?: string;

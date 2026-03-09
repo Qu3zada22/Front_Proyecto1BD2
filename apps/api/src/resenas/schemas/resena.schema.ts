@@ -5,8 +5,9 @@ export type ResenaDocument = HydratedDocument<Resena>;
 
 @Schema({ timestamps: false, collection: 'resenas' })
 export class Resena {
+    // campo igual al seed: 'usuario_id' (no 'cliente_id')
     @Prop({ type: Types.ObjectId, ref: 'Usuario', required: true })
-    cliente_id: Types.ObjectId;
+    usuario_id: Types.ObjectId;
 
     @Prop({ type: Types.ObjectId, ref: 'Restaurante' })
     restaurante_id?: Types.ObjectId;
@@ -43,11 +44,11 @@ ResenaSchema.index(
 );
 // Compuesto único: evitar reseñas duplicadas del mismo usuario al mismo restaurante
 ResenaSchema.index(
-    { cliente_id: 1, restaurante_id: 1 },
-    { unique: true, sparse: true, name: 'idx_resenas_cliente_restaurante_unique' },
+    { usuario_id: 1, restaurante_id: 1 },
+    { unique: true, sparse: true, name: 'idx_resenas_usuario_restaurante_unique' },
 );
 // Simple: reseñas de un usuario
-ResenaSchema.index({ cliente_id: 1 }, { name: 'idx_resenas_cliente' });
+ResenaSchema.index({ usuario_id: 1 }, { name: 'idx_resenas_usuario' });
 // Simple: reseñas por orden
 ResenaSchema.index({ orden_id: 1 }, { name: 'idx_resenas_orden' });
 // Simple desc: reseñas recientes primero

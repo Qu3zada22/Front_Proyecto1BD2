@@ -53,11 +53,14 @@ export class Restaurante {
     horario: Record<string, HorarioDia>;
 
     @Prop() telefono?: string;
-    @Prop() img_portada?: string;
+    // GridFS reference — ObjectId devuelto por POST /api/files/upload
+    @Prop({ type: Types.ObjectId }) img_portada_id?: Types.ObjectId;
+    @Prop() img_portada?: string;  // legacy string URL (compatibilidad)
 
     @Prop({ default: 0 }) calificacion_prom: number;
     @Prop({ default: 0 }) total_resenas: number;
     @Prop({ default: true }) activo: boolean;
+    @Prop({ default: () => new Date() }) fecha_creacion: Date;
 }
 
 export const RestauranteSchema = SchemaFactory.createForClass(Restaurante);

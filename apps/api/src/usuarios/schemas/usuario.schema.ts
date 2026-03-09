@@ -37,6 +37,8 @@ export class Usuario {
 
     @Prop({ default: true }) activo: boolean;
 
+    @Prop({ default: () => new Date() }) fecha_registro: Date;
+
     @Prop({ type: [String], default: [] }) preferencias: string[];
 
     @Prop({ type: [DireccionUsuarioSchema], default: [] })

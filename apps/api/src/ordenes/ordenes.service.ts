@@ -6,7 +6,7 @@ import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.sche
 import { CreateOrdenDto } from './dto/create-orden.dto';
 
 const ESTADOS_VALIDOS: EstadoOrden[] = [
-    'pendiente', 'confirmado', 'en_camino', 'entregado', 'cancelado',
+    'pendiente', 'confirmado', 'en_proceso', 'en_camino', 'entregado', 'cancelado',
 ];
 
 @Injectable()

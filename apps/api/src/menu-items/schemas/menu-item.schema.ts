@@ -26,7 +26,9 @@ export class MenuItem {
     // Campo array → índice multikey automático
     @Prop({ type: [String], default: [] }) etiquetas: string[];
 
-    @Prop() imagen?: string;
+    // GridFS reference — ObjectId devuelto por POST /api/files/upload
+    @Prop({ type: Types.ObjectId }) imagen_id?: Types.ObjectId;
+    @Prop() imagen?: string;  // legacy string URL (compatibilidad)
 
     @Prop({ default: true }) disponible: boolean;
 

@@ -60,6 +60,8 @@ export class ReportesService {
                     cantidad_resenas: { $size: '$resenas' },
                 },
             },
+            // mínimo 5 reseñas (según diseño doc)
+            { $match: { cantidad_resenas: { $gte: 5 } } },
             { $sort: { avg_calificacion: -1, cantidad_resenas: -1 } },
             { $limit: limit },
             {
