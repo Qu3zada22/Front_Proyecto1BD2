@@ -21,6 +21,12 @@ async function createUserIndexes(db) {
     col.createIndex({ nombre: 'text' }, { name: 'nombre_text' }),
     // Simple sobre rol
     col.createIndex({ rol: 1 }, { name: 'rol_simple' }),
+    // Compuesto: usuarios activos por rol
+    col.createIndex({ rol: 1, activo: 1 }, { name: 'idx_usuarios_rol_activo' }),
+    // Multikey sobre preferencias alimentarias ['vegano','sin_gluten',...]
+    col.createIndex({ preferencias: 1 }, { name: 'idx_usuarios_preferencias' }),
+    // Simple desc sobre fecha_registro: findAll ordenado por registro (evita COLLSCAN)
+    col.createIndex({ fecha_registro: -1 }, { name: 'idx_usuarios_fecha_registro' }),
   ])
   console.log('  [OK] usuarios indexes')
 }
@@ -38,6 +44,8 @@ async function createRestaurantIndexes(db) {
     col.createIndex({ calificacion_prom: -1 }, { name: 'calificacion_prom_desc' }),
     // Texto sobre nombre y descripcion
     col.createIndex({ nombre: 'text', descripcion: 'text' }, { name: 'nombre_descripcion_text' }),
+    // Compuesto: listar restaurantes activos por nombre
+    col.createIndex({ nombre: 1, activo: 1 }, { name: 'idx_restaurantes_nombre_activo' }),
   ])
   console.log('  [OK] restaurantes indexes')
 }
@@ -56,6 +64,12 @@ async function createMenuItemIndexes(db) {
     col.createIndex({ nombre: 'text', descripcion: 'text' }, { name: 'nombre_descripcion_text' }),
     // Simple descendente sobre veces_ordenado
     col.createIndex({ veces_ordenado: -1 }, { name: 'veces_ordenado_desc' }),
+    // Compuesto: items disponibles de un restaurante
+    col.createIndex({ restaurante_id: 1, disponible: 1 }, { name: 'idx_menuitems_restaurante_disponible' }),
+    // Compuesto: items de un restaurante por categoría
+    col.createIndex({ restaurante_id: 1, categoria: 1 }, { name: 'idx_menuitems_restaurante_categoria' }),
+    // Simple: filtro global por disponible sin restaurante_id (evita COLLSCAN con notablescan)
+    col.createIndex({ disponible: 1 }, { name: 'idx_menuitems_disponible' }),
   ])
   console.log('  [OK] menu_items indexes')
 }
@@ -75,6 +89,8 @@ async function createOrderIndexes(db) {
     ),
     // Simple sobre estado
     col.createIndex({ estado: 1 }, { name: 'estado_simple' }),
+    // Compuesto: ingresosPorDia (estado + rango fechas, sin usuario_id ni restaurante_id)
+    col.createIndex({ estado: 1, fecha_creacion: -1 }, { name: 'idx_ordenes_estado_fecha' }),
     // Multikey sobre items.item_id
     col.createIndex({ 'items.item_id': 1 }, { name: 'items_item_id_multikey' }),
     // Simple descendente sobre fecha_creacion
@@ -98,6 +114,10 @@ async function createReviewIndexes(db) {
     col.createIndex({ titulo: 'text', comentario: 'text' }, { name: 'titulo_comentario_text' }),
     // Simple sobre orden_id
     col.createIndex({ orden_id: 1 }, { name: 'orden_id_simple' }),
+    // Multikey sobre likes (array de ObjectIds, $addToSet/$pull)
+    col.createIndex({ likes: 1 }, { name: 'idx_resenas_likes' }),
+    // Simple: filtrar reseñas activas/inactivas (soft-delete, evita COLLSCAN con notablescan)
+    col.createIndex({ activa: 1 }, { name: 'idx_resenas_activa' }),
   ])
   console.log('  [OK] resenas indexes')
 }

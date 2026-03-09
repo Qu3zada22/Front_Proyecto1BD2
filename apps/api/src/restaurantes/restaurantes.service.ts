@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Connection, Model } from 'mongoose';
 import { Restaurante, RestauranteDocument } from './schemas/restaurante.schema';
 import { MenuItem } from '../menu-items/schemas/menu-item.schema';
 import { Orden } from '../ordenes/schemas/orden.schema';
+import { Usuario } from '../usuarios/schemas/usuario.schema';
 
 @Injectable()
 export class RestaurantesService {
@@ -11,10 +12,15 @@ export class RestaurantesService {
         @InjectModel(Restaurante.name) private restauranteModel: Model<RestauranteDocument>,
         @InjectModel(MenuItem.name) private menuItemModel: Model<any>,
         @InjectModel(Orden.name) private ordenModel: Model<any>,
+        @InjectModel(Usuario.name) private usuarioModel: Model<any>,
         @InjectConnection() private connection: Connection,
     ) { }
 
     async create(data: any): Promise<RestauranteDocument> {
+        if (data.propietario_id) {
+            const ownerExists = await this.usuarioModel.countDocuments({ _id: data.propietario_id });
+            if (!ownerExists) throw new BadRequestException('El propietario referenciado no existe');
+        }
         return this.restauranteModel.create(data);
     }
 
@@ -78,6 +84,15 @@ export class RestaurantesService {
     }
 
     async remove(id: string): Promise<{ deleted: boolean }> {
+        const [ordenesCount, menuItemsCount] = await Promise.all([
+            this.ordenModel.countDocuments({ restaurante_id: id }),
+            this.menuItemModel.countDocuments({ restaurante_id: id }),
+        ]);
+        if (ordenesCount > 0 || menuItemsCount > 0) {
+            throw new BadRequestException(
+                'No se puede eliminar: el restaurante tiene datos asociados. Usa PATCH :id/cancel en su lugar.',
+            );
+        }
         const result = await this.restauranteModel.findByIdAndDelete(id).exec();
         if (!result) throw new NotFoundException('Restaurante no encontrado');
         return { deleted: true };
@@ -107,9 +122,10 @@ export class RestaurantesService {
             await this.ordenModel.updateMany(
                 {
                     restaurante_id: restaurante._id,
-                    estado: { $in: ['pendiente', 'en_proceso', 'en_camino'] },
+                    // Solo pendiente/en_proceso — en_camino ya está en tránsito (diseño)
+                    estado: { $in: ['pendiente', 'en_proceso'] },
                 },
-                { $set: { estado: 'cancelado' }, $push: { historial_estados: histEntry } },
+                { $set: { estado: 'cancelado' }, $push: { historial_estados: { $each: [histEntry], $slice: -5 } } },
                 { session },
             );
 

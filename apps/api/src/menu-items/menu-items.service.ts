@@ -1,15 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { MenuItem, MenuItemDocument } from './schemas/menu-item.schema';
+import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
 
 @Injectable()
 export class MenuItemsService {
-    constructor(@InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>) { }
+    constructor(
+        @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
+        @InjectModel(Restaurante.name) private restauranteModel: Model<any>,
+    ) { }
 
     async create(dto: CreateMenuItemDto): Promise<MenuItemDocument> {
+        const restExists = await this.restauranteModel.countDocuments({ _id: dto.restaurante_id, activo: true });
+        if (!restExists) throw new BadRequestException('El restaurante referenciado no existe o está inactivo');
         return this.menuItemModel.create(dto);
     }
 
@@ -17,10 +23,13 @@ export class MenuItemsService {
         restaurante_id?: string;
         categoria?: string;
         etiqueta?: string;
+        disponible?: boolean;
         skip?: number;
         limit?: number;
     }): Promise<MenuItemDocument[]> {
         const filter: any = {};
+        // Por defecto mostrar solo platillos disponibles; pasar disponible=false para ver todos
+        filter.disponible = query.disponible !== undefined ? query.disponible : true;
         if (query.restaurante_id) filter.restaurante_id = new Types.ObjectId(query.restaurante_id);
         if (query.categoria) filter.categoria = query.categoria;
         if (query.etiqueta) filter.etiquetas = query.etiqueta;

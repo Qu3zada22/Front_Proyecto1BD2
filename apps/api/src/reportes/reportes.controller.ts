@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ReportesService } from './reportes.service';
 
@@ -36,26 +36,29 @@ export class ReportesController {
     // ── Reportes complejos ───────────────────────────────────────────────────
 
     @Get('restaurants/top-rated')
-    @ApiOperation({ summary: 'Top restaurantes', description: 'Aggregation compleja: $lookup reseñas → $addFields calificacion_prom → $sort.' })
+    @ApiOperation({ summary: 'Top restaurantes', description: 'Aggregation compleja: parte de resenas (fuente de verdad) → $group avg/count → $match(≥5 reseñas) → $sort/$limit → $lookup restaurantes → $project.' })
     @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
     topRestaurantes(@Query('limit') limit: string) {
-        return this.reportesService.topRestaurantes(+limit || 10);
+        return this.reportesService.topRestaurantes(Math.max(1, +limit || 10));
     }
 
     @Get('menu-items/best-sellers')
     @ApiOperation({ summary: 'Platillos más vendidos', description: 'Aggregation: $unwind items + $group por item_id + $sort por cantidad.' })
     @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
     platillosMasVendidos(@Query('limit') limit: string) {
-        return this.reportesService.platillosMasVendidos(+limit || 10);
+        return this.reportesService.platillosMasVendidos(Math.max(1, +limit || 10));
     }
 
     @Get('revenue/by-day')
     @ApiOperation({ summary: 'Ingresos por día', description: 'Aggregation: $match por rango de fechas + $group con $dateToString + suma de totales.' })
-    @ApiQuery({ name: 'desde', required: false, example: '2024-01-01', description: 'Fecha inicio ISO (default: 2024-01-01, datos entre 2023-2025)' })
+    @ApiQuery({ name: 'desde', required: false, example: '2023-01-01', description: 'Fecha inicio ISO (default: 2023-01-01, datos entre 2023-2025)' })
     @ApiQuery({ name: 'hasta', required: false, example: '2025-12-31', description: 'Fecha fin ISO (default: 2025-12-31)' })
     ingresosPorDia(@Query('desde') desde: string, @Query('hasta') hasta: string) {
-        const start = desde ?? '2024-01-01';
+        const start = desde ?? '2023-01-01';
         const end = hasta ?? '2025-12-31';
+        if (isNaN(Date.parse(start)) || isNaN(Date.parse(end))) {
+            throw new BadRequestException('Formato de fecha inválido. Use formato ISO (YYYY-MM-DD)');
+        }
         return this.reportesService.ingresosPorDia(start, end);
     }
 
@@ -81,6 +84,6 @@ export class ReportesController {
     })
     @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
     usuariosConMayorGasto(@Query('limit') limit: string) {
-        return this.reportesService.usuariosConMayorGasto(+limit || 10);
+        return this.reportesService.usuariosConMayorGasto(Math.max(1, +limit || 10));
     }
 }

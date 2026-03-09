@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RestaurantesService } from './restaurantes.service';
 import { Restaurante } from './schemas/restaurante.schema';
 import { MenuItem } from '../menu-items/schemas/menu-item.schema';
 import { Orden } from '../ordenes/schemas/orden.schema';
+import { Usuario } from '../usuarios/schemas/usuario.schema';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,10 +48,16 @@ const mockModel = {
 
 const mockMenuItemModel = {
   updateMany: jest.fn(),
+  countDocuments: jest.fn(),
 };
 
 const mockOrdenModel = {
   updateMany: jest.fn(),
+  countDocuments: jest.fn(),
+};
+
+const mockUsuarioModel = {
+  countDocuments: jest.fn(),
 };
 
 // ── suite ─────────────────────────────────────────────────────────────────────
@@ -63,6 +70,7 @@ describe('RestaurantesService', () => {
     mockConnection.startSession.mockResolvedValue(mockSession);
     mockMenuItemModel.updateMany.mockResolvedValue({ modifiedCount: 5 });
     mockOrdenModel.updateMany.mockResolvedValue({ modifiedCount: 3 });
+    mockUsuarioModel.countDocuments.mockResolvedValue(1);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -70,6 +78,7 @@ describe('RestaurantesService', () => {
         { provide: getModelToken(Restaurante.name), useValue: mockModel },
         { provide: getModelToken(MenuItem.name), useValue: mockMenuItemModel },
         { provide: getModelToken(Orden.name), useValue: mockOrdenModel },
+        { provide: getModelToken(Usuario.name), useValue: mockUsuarioModel },
         { provide: getConnectionToken(), useValue: mockConnection },
       ],
     }).compile();
@@ -81,14 +90,24 @@ describe('RestaurantesService', () => {
 
   describe('create', () => {
     it('should call model.create with the provided data and return result', async () => {
-      const data = { nombre: 'Pizza Palace', categorias: ['italiana'] };
+      const data = { nombre: 'Pizza Palace', categorias: ['italiana'], propietario_id: 'owner1' };
       const created = { _id: 'abc123', ...data };
       mockModel.create.mockResolvedValue(created);
 
       const result = await service.create(data);
 
+      expect(mockUsuarioModel.countDocuments).toHaveBeenCalledWith({ _id: 'owner1' });
       expect(mockModel.create).toHaveBeenCalledWith(data);
       expect(result).toEqual(created);
+    });
+
+    it('should throw BadRequestException when propietario_id does not exist', async () => {
+      mockUsuarioModel.countDocuments.mockResolvedValue(0);
+      const data = { nombre: 'Pizza Palace', propietario_id: 'nonexistent' };
+
+      await expect(service.create(data)).rejects.toThrow(BadRequestException);
+      await expect(service.create(data)).rejects.toThrow('El propietario referenciado no existe');
+      expect(mockModel.create).not.toHaveBeenCalled();
     });
   });
 
@@ -255,17 +274,38 @@ describe('RestaurantesService', () => {
   // ── remove ──────────────────────────────────────────────────────────────────
 
   describe('remove', () => {
-    it('should delete and return { deleted: true }', async () => {
+    it('should delete when no associated data exists', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockMenuItemModel.countDocuments.mockResolvedValue(0);
       const query = createMockQuery({ _id: 'abc' });
       mockModel.findByIdAndDelete.mockReturnValue(query);
 
       const result = await service.remove('abc');
 
+      expect(mockOrdenModel.countDocuments).toHaveBeenCalledWith({ restaurante_id: 'abc' });
+      expect(mockMenuItemModel.countDocuments).toHaveBeenCalledWith({ restaurante_id: 'abc' });
       expect(mockModel.findByIdAndDelete).toHaveBeenCalledWith('abc');
       expect(result).toEqual({ deleted: true });
     });
 
+    it('should throw BadRequestException when restaurante has associated ordenes', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(3);
+      mockMenuItemModel.countDocuments.mockResolvedValue(0);
+
+      await expect(service.remove('abc')).rejects.toThrow(BadRequestException);
+      await expect(service.remove('abc')).rejects.toThrow('No se puede eliminar');
+    });
+
+    it('should throw BadRequestException when restaurante has associated menu items', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockMenuItemModel.countDocuments.mockResolvedValue(5);
+
+      await expect(service.remove('abc')).rejects.toThrow(BadRequestException);
+    });
+
     it('should throw NotFoundException when restaurante to delete is not found', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockMenuItemModel.countDocuments.mockResolvedValue(0);
       const query = createMockQuery(null);
       mockModel.findByIdAndDelete.mockReturnValue(query);
 
@@ -326,11 +366,12 @@ describe('RestaurantesService', () => {
 
       const [filter, update, opts] = mockOrdenModel.updateMany.mock.calls[0];
       expect(filter.restaurante_id).toBe(restauranteDoc._id);
-      expect(filter.estado.$in).toEqual(
-        expect.arrayContaining(['pendiente', 'en_proceso', 'en_camino']),
-      );
+      // Solo pendiente/en_proceso — en_camino ya está en tránsito (diseño)
+      expect(filter.estado.$in).toEqual(['pendiente', 'en_proceso']);
       expect(update.$set.estado).toBe('cancelado');
-      expect(update.$push.historial_estados).toMatchObject({ estado: 'cancelado' });
+      // $each+$slice:-5 mantiene el array acotado en máximo 5 transiciones (diseño)
+      expect(update.$push.historial_estados.$each[0]).toMatchObject({ estado: 'cancelado' });
+      expect(update.$push.historial_estados.$slice).toBe(-5);
       expect(opts).toMatchObject({ session: mockSession });
     });
 

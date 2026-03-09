@@ -40,15 +40,29 @@ export class MenuItem {
 export const MenuItemSchema = SchemaFactory.createForClass(MenuItem);
 
 // ---- Índices ----
+// Compuesto ESR: restaurante + categoria + disponible (platillos activos por categoría)
+MenuItemSchema.index(
+    { restaurante_id: 1, categoria: 1, disponible: 1 },
+    { name: 'restaurante_categoria_disponible_esr' },
+);
 // Compuesto: listar items disponibles de un restaurante
 MenuItemSchema.index(
     { restaurante_id: 1, disponible: 1 },
     { name: 'idx_menuitems_restaurante_disponible' },
 );
 // Multikey: filtrar por etiquetas (campo array → MongoDB crea índice multikey)
-MenuItemSchema.index({ etiquetas: 1 }, { name: 'idx_menuitems_etiquetas' });
+MenuItemSchema.index({ etiquetas: 1 }, { name: 'etiquetas_multikey' });
+// Texto: búsqueda full-text en nombre y descripción
+MenuItemSchema.index(
+    { nombre: 'text', descripcion: 'text' },
+    { name: 'nombre_descripcion_text' },
+);
+// Simple desc: ordenar por popularidad
+MenuItemSchema.index({ veces_ordenado: -1 }, { name: 'veces_ordenado_desc' });
 // Compuesto: ordenar por categoría dentro de un restaurante
 MenuItemSchema.index(
     { restaurante_id: 1, categoria: 1 },
     { name: 'idx_menuitems_restaurante_categoria' },
 );
+// Simple: findAll filtrando solo por disponible sin restaurante_id (evita COLLSCAN con notablescan)
+MenuItemSchema.index({ disponible: 1 }, { name: 'idx_menuitems_disponible' });

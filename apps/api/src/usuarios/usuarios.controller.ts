@@ -20,8 +20,20 @@ export class UsuariosController {
     @ApiOperation({ summary: 'Listar usuarios', description: 'Devuelve todos los usuarios con filtros opcionales.' })
     @ApiQuery({ name: 'rol', required: false, enum: ['cliente', 'propietario', 'admin'] })
     @ApiQuery({ name: 'email', required: false, description: 'Filtrar por email (búsqueda parcial)' })
-    findAll(@Query('rol') rol?: string, @Query('email') email?: string) {
-        return this.usuariosService.findAll({ rol, email });
+    @ApiQuery({ name: 'skip', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    findAll(
+        @Query('rol') rol?: string,
+        @Query('email') email?: string,
+        @Query('skip') skip?: string,
+        @Query('limit') limit?: string,
+    ) {
+        return this.usuariosService.findAll({
+            rol,
+            email,
+            skip: skip !== undefined ? (parseInt(skip, 10) || 0) : undefined,
+            limit: limit !== undefined ? (parseInt(limit, 10) || 50) : undefined,
+        });
     }
 
     @Post('login')
@@ -71,5 +83,12 @@ export class UsuariosController {
         @Param('alias') alias: string,
     ) {
         return this.usuariosService.removeAddress(id, alias);
+    }
+
+    @Get('by-email/:email')
+    @ApiOperation({ summary: 'Buscar usuario por email exacto', description: 'Busca un usuario por email exacto. Útil para validación de duplicados.' })
+    @ApiParam({ name: 'email', description: 'Email exacto del usuario' })
+    findByEmail(@Param('email') email: string) {
+        return this.usuariosService.findByEmail(email);
     }
 }

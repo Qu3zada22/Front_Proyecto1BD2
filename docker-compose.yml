@@ -24,8 +24,8 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
-    # Inicia con replica set habilitado (requerido para transacciones ACID)
-    command: ["--replSet", "rs0", "--bind_ip_all"]
+    # Inicia con replica set + notablescan (rechaza queries sin índice, según diseño)
+    command: ["--replSet", "rs0", "--bind_ip_all", "--setParameter", "notablescan=1"]
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s

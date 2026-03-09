@@ -23,6 +23,7 @@ export class ReportesService {
         return this.ordenModel.aggregate([
             { $group: { _id: '$estado', total: { $sum: 1 } } },
             { $sort: { total: -1 } },
+            { $project: { estado: '$_id', total: 1, _id: 0 } },
         ]);
     }
 
@@ -38,41 +39,53 @@ export class ReportesService {
     async usuariosPorRol(): Promise<any[]> {
         return this.usuarioModel.aggregate([
             { $group: { _id: '$rol', total: { $sum: 1 } } },
+            { $project: { rol: '$_id', total: 1, _id: 0 } },
         ]);
     }
 
     // ── Agregaciones complejas ───────────────────────────────────────────────
 
+    // Pipeline parte de resenas (fuente de verdad), no del campo desnormalizado
     async topRestaurantes(limit = 10): Promise<any[]> {
-        return this.restauranteModel.aggregate([
-            { $match: { activo: true } },
+        return this.resenaModel.aggregate([
+            // $match primero — reduce volumen, usa índice restaurante_calificacion (IXSCAN)
+            { $match: { activa: true, restaurante_id: { $exists: true } } },
+            // $group — calcula promedio real desde la fuente de verdad
             {
-                $lookup: {
-                    from: 'resenas',
-                    localField: '_id',
-                    foreignField: 'restaurante_id',
-                    pipeline: [{ $match: { activa: true } }],
-                    as: 'resenas',
+                $group: {
+                    _id: '$restaurante_id',
+                    avg_calificacion: { $avg: '$calificacion' },
+                    cantidad_resenas: { $sum: 1 },
                 },
             },
-            {
-                $addFields: {
-                    avg_calificacion: { $avg: '$resenas.calificacion' },
-                    cantidad_resenas: { $size: '$resenas' },
-                },
-            },
-            // mínimo 5 reseñas (según diseño doc)
+            // segundo $match — necesita el conteo calculado en el $group anterior
             { $match: { cantidad_resenas: { $gte: 5 } } },
             { $sort: { avg_calificacion: -1, cantidad_resenas: -1 } },
             { $limit: limit },
+            // $lookup — trae nombre, categorías y ubicación del restaurante
+            {
+                $lookup: {
+                    from: 'restaurantes',
+                    localField: '_id',
+                    foreignField: '_id',
+                    pipeline: [
+                        { $match: { activo: true } },
+                        { $project: { nombre: 1, categorias: 1, ubicacion: 1, _id: 0 } },
+                    ],
+                    as: 'restaurante',
+                },
+            },
+            // $unwind — convierte el array del lookup a objeto
+            { $unwind: '$restaurante' },
+            // $project — redondea promedio a 2 decimales con $round
             {
                 $project: {
-                    nombre: 1,
-                    categorias: 1,
-                    direccion: 1,
-                    calificacion_prom: 1,
+                    nombre: '$restaurante.nombre',
+                    categorias: '$restaurante.categorias',
+                    ubicacion: '$restaurante.ubicacion',
                     avg_calificacion: { $round: ['$avg_calificacion', 2] },
                     cantidad_resenas: 1,
+                    _id: 0,
                 },
             },
         ]);
@@ -88,7 +101,8 @@ export class ReportesService {
                     nombre: { $first: '$items.nombre' },
                     total_vendidos: { $sum: '$items.cantidad' },
                     ingresos: {
-                        $sum: { $toDouble: '$items.subtotal' },
+                        // $toDecimal preserva precisión Decimal128 antes de acumular (diseño)
+                        $sum: { $toDecimal: '$items.subtotal' },
                     },
                 },
             },
@@ -119,9 +133,10 @@ export class ReportesService {
             {
                 $group: {
                     _id: { $dateToString: { format: '%Y-%m-%d', date: '$fecha_creacion' } },
-                    total_ingresos: { $sum: { $toDouble: '$total' } },
+                    // $toDecimal preserva precisión Decimal128 antes de acumular (diseño)
+                    total_ingresos: { $sum: { $toDecimal: '$total' } },
                     total_ordenes: { $sum: 1 },
-                    ticket_promedio: { $avg: { $toDouble: '$total' } },
+                    ticket_promedio: { $avg: { $toDecimal: '$total' } },
                 },
             },
             { $sort: { _id: 1 } },
@@ -142,6 +157,7 @@ export class ReportesService {
             { $unwind: '$categorias' },
             { $group: { _id: '$categorias', total: { $sum: 1 } } },
             { $sort: { total: -1 } },
+            { $project: { categoria: '$_id', total: 1, _id: 0 } },
         ]);
     }
 
@@ -156,9 +172,10 @@ export class ReportesService {
                         anio: { $year: '$fecha_creacion' },
                         mes: { $month: '$fecha_creacion' },
                     },
-                    total_ingresos: { $sum: { $toDouble: '$total' } },
+                    // $toDecimal preserva precisión Decimal128 antes de acumular (diseño)
+                    total_ingresos: { $sum: { $toDecimal: '$total' } },
                     total_ordenes: { $sum: 1 },
-                    ticket_promedio: { $avg: { $toDouble: '$total' } },
+                    ticket_promedio: { $avg: { $toDecimal: '$total' } },
                 },
             },
             { $sort: { '_id.anio': -1, '_id.mes': -1, total_ingresos: -1 } },
@@ -177,7 +194,13 @@ export class ReportesService {
                         $concat: [
                             { $toString: '$_id.anio' },
                             '-',
-                            { $toString: '$_id.mes' },
+                            {
+                                $cond: [
+                                    { $lt: ['$_id.mes', 10] },
+                                    { $concat: ['0', { $toString: '$_id.mes' }] },
+                                    { $toString: '$_id.mes' },
+                                ],
+                            },
                         ],
                     },
                     restaurante: { $arrayElemAt: ['$restaurante.nombre', 0] },
@@ -197,7 +220,8 @@ export class ReportesService {
             {
                 $group: {
                     _id: '$usuario_id',
-                    total_gastado: { $sum: { $toDouble: '$total' } },
+                    // $toDecimal preserva precisión Decimal128 antes de acumular (diseño)
+                    total_gastado: { $sum: { $toDecimal: '$total' } },
                     total_ordenes: { $sum: 1 },
                 },
             },

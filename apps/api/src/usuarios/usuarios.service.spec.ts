@@ -1,8 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
 import { Usuario } from './schemas/usuario.schema';
+import { Orden } from '../ordenes/schemas/orden.schema';
+import { Resena } from '../resenas/schemas/resena.schema';
+import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +35,18 @@ const mockModel = {
   distinct: jest.fn(),
 };
 
+const mockOrdenModel = {
+  countDocuments: jest.fn(),
+};
+
+const mockResenaModel = {
+  countDocuments: jest.fn(),
+};
+
+const mockRestauranteModel = {
+  countDocuments: jest.fn(),
+};
+
 // ── suite ─────────────────────────────────────────────────────────────────────
 
 describe('UsuariosService', () => {
@@ -46,6 +61,18 @@ describe('UsuariosService', () => {
         {
           provide: getModelToken(Usuario.name),
           useValue: mockModel,
+        },
+        {
+          provide: getModelToken(Orden.name),
+          useValue: mockOrdenModel,
+        },
+        {
+          provide: getModelToken(Resena.name),
+          useValue: mockResenaModel,
+        },
+        {
+          provide: getModelToken(Restaurante.name),
+          useValue: mockRestauranteModel,
         },
       ],
     }).compile();
@@ -71,12 +98,27 @@ describe('UsuariosService', () => {
       expect(mockModel.create).toHaveBeenCalledWith(data);
       expect(result).toEqual(created);
     });
+
+    it('should normalize email to lowercase and trim whitespace', async () => {
+      const data = {
+        nombre: 'Ana',
+        email: '  ANA@Example.COM  ',
+        password: 'pw',
+        rol: 'cliente',
+      };
+      mockModel.create.mockResolvedValue({ _id: 'u2', ...data, email: 'ana@example.com' });
+
+      await service.create(data);
+
+      const callArg = mockModel.create.mock.calls[0][0];
+      expect(callArg.email).toBe('ana@example.com');
+    });
   });
 
   // ── findAll ─────────────────────────────────────────────────────────────────
 
   describe('findAll', () => {
-    it('should return users excluding password field, sorted by fecha_registro desc', async () => {
+    it('should return users excluding password field, sorted by fecha_registro desc, with default pagination', async () => {
       const users = [{ nombre: 'Juan' }, { nombre: 'Ana' }];
       const query = createMockQuery(users);
       mockModel.find.mockReturnValue(query);
@@ -86,9 +128,21 @@ describe('UsuariosService', () => {
       expect(mockModel.find).toHaveBeenCalledWith({});
       expect(query.select).toHaveBeenCalledWith('-password');
       expect(query.sort).toHaveBeenCalledWith({ fecha_registro: -1 });
+      expect(query.skip).toHaveBeenCalledWith(0);
+      expect(query.limit).toHaveBeenCalledWith(50);
       expect(query.lean).toHaveBeenCalled();
       expect(query.exec).toHaveBeenCalled();
       expect(result).toEqual(users);
+    });
+
+    it('should apply custom skip and limit when provided', async () => {
+      const query = createMockQuery([]);
+      mockModel.find.mockReturnValue(query);
+
+      await service.findAll({ skip: 10, limit: 5 });
+
+      expect(query.skip).toHaveBeenCalledWith(10);
+      expect(query.limit).toHaveBeenCalledWith(5);
     });
 
     it('should filter by rol when provided', async () => {
@@ -112,6 +166,17 @@ describe('UsuariosService', () => {
       expect(callArg.email).toBeInstanceOf(RegExp);
       expect(callArg.email.source).toBe('juan');
       expect(callArg.email.flags).toContain('i');
+    });
+
+    it('should escape regex special characters in email filter', async () => {
+      const query = createMockQuery([]);
+      mockModel.find.mockReturnValue(query);
+
+      await service.findAll({ email: 'user+tag@example.com' });
+
+      const callArg = mockModel.find.mock.calls[0][0];
+      expect(callArg.email).toBeInstanceOf(RegExp);
+      expect(callArg.email.source).toBe('user\\+tag@example\\.com');
     });
 
     it('should filter by both rol and email simultaneously', async () => {
@@ -252,17 +317,54 @@ describe('UsuariosService', () => {
   // ── remove ──────────────────────────────────────────────────────────────────
 
   describe('remove', () => {
-    it('should delete user and return { deleted: true }', async () => {
+    it('should delete user and return { deleted: true } when no associated data', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockResenaModel.countDocuments.mockResolvedValue(0);
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
       const query = createMockQuery({ _id: 'u1' });
       mockModel.findByIdAndDelete.mockReturnValue(query);
 
       const result = await service.remove('u1');
 
+      expect(mockOrdenModel.countDocuments).toHaveBeenCalledWith({ usuario_id: 'u1' });
+      expect(mockResenaModel.countDocuments).toHaveBeenCalledWith({ usuario_id: 'u1' });
+      expect(mockRestauranteModel.countDocuments).toHaveBeenCalledWith({ propietario_id: 'u1' });
       expect(mockModel.findByIdAndDelete).toHaveBeenCalledWith('u1');
       expect(result).toEqual({ deleted: true });
     });
 
+    it('should throw BadRequestException when user has associated ordenes', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(3);
+      mockResenaModel.countDocuments.mockResolvedValue(0);
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
+
+      await expect(service.remove('u1')).rejects.toThrow(BadRequestException);
+      await expect(service.remove('u1')).rejects.toThrow('orden(es)');
+      expect(mockModel.findByIdAndDelete).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when user has associated resenas', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockResenaModel.countDocuments.mockResolvedValue(5);
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
+
+      await expect(service.remove('u1')).rejects.toThrow(BadRequestException);
+      await expect(service.remove('u1')).rejects.toThrow('reseña(s)');
+    });
+
+    it('should throw BadRequestException when user has associated restaurantes', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockResenaModel.countDocuments.mockResolvedValue(0);
+      mockRestauranteModel.countDocuments.mockResolvedValue(2);
+
+      await expect(service.remove('u1')).rejects.toThrow(BadRequestException);
+      await expect(service.remove('u1')).rejects.toThrow('restaurante(s)');
+    });
+
     it('should throw NotFoundException when user to delete is not found', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      mockResenaModel.countDocuments.mockResolvedValue(0);
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
       const query = createMockQuery(null);
       mockModel.findByIdAndDelete.mockReturnValue(query);
 
@@ -301,7 +403,7 @@ describe('UsuariosService', () => {
   // ── addAddress ($push) ───────────────────────────────────────────────────────
 
   describe('addAddress', () => {
-    it('should use $push operator to add address to direcciones array', async () => {
+    it('should use $push with $each and $slice:-10 to enforce max 10 addresses', async () => {
       const newAddress = { alias: 'Casa', calle: '4a Ave', ciudad: 'GT', pais: 'Guatemala' };
       const updated = { _id: 'u1', direcciones: [newAddress] };
       const query = createMockQuery(updated);
@@ -311,7 +413,7 @@ describe('UsuariosService', () => {
 
       expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
         'u1',
-        { $push: { direcciones: newAddress } },
+        { $push: { direcciones: { $each: [newAddress], $slice: -10 } } },
         { new: true },
       );
       expect(query.select).toHaveBeenCalledWith('-password');

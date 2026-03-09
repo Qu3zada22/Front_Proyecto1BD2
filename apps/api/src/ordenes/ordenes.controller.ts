@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestj
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { OrdenesService } from './ordenes.service';
 import { CreateOrdenDto } from './dto/create-orden.dto';
+import { DeleteOrdenesDto } from './dto/delete-ordenes.dto';
 import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 import { PaginationDto } from '../common/dto/pagination.dto';
 
@@ -45,16 +46,21 @@ export class OrdenesController {
     @Patch(':id/status')
     @ApiOperation({ summary: 'Actualizar estado del pedido', description: 'Estados válidos: pendiente → en_proceso → en_camino → entregado | cancelado.' })
     @ApiParam({ name: 'id', description: 'ObjectId de la orden' })
-    @ApiBody({ schema: { example: { estado: 'en_proceso' } } })
-    updateStatus(@Param('id', ParseMongoIdPipe) id: string, @Body('estado') estado: string) {
-        return this.ordenesService.updateStatus(id, estado);
+    @ApiBody({ schema: { example: { estado: 'en_proceso', actor_id: '64a1b2c3d4e5f6a7b8c9d0e1', nota: 'Cocina confirmó la orden' } } })
+    updateStatus(
+        @Param('id', ParseMongoIdPipe) id: string,
+        @Body('estado') estado: string,
+        @Body('actor_id') actorId?: string,
+        @Body('nota') nota?: string,
+    ) {
+        return this.ordenesService.updateStatus(id, estado, actorId, nota);
     }
 
     @Delete('bulk')
     @ApiOperation({ summary: 'Eliminar múltiples pedidos', description: 'deleteMany por array de IDs.' })
     @ApiBody({ schema: { example: { ids: ['64a1b2c3d4e5f6a7b8c9d0e1', '64a1b2c3d4e5f6a7b8c9d0e2'] } } })
-    removeMany(@Body('ids') ids: string[]) {
-        return this.ordenesService.removeMany(ids);
+    removeMany(@Body() dto: DeleteOrdenesDto) {
+        return this.ordenesService.removeMany(dto.ids);
     }
 
     @Delete(':id')

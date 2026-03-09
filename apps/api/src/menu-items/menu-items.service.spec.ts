@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { MenuItemsService } from './menu-items.service';
 import { MenuItem } from './schemas/menu-item.schema';
+import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,10 @@ const mockModel = {
   distinct: jest.fn(),
 };
 
+const mockRestauranteModel = {
+  countDocuments: jest.fn(),
+};
+
 // ── suite ─────────────────────────────────────────────────────────────────────
 
 describe('MenuItemsService', () => {
@@ -40,6 +45,7 @@ describe('MenuItemsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockRestauranteModel.countDocuments.mockResolvedValue(1);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -47,6 +53,10 @@ describe('MenuItemsService', () => {
         {
           provide: getModelToken(MenuItem.name),
           useValue: mockModel,
+        },
+        {
+          provide: getModelToken(Restaurante.name),
+          useValue: mockRestauranteModel,
         },
       ],
     }).compile();
@@ -74,11 +84,58 @@ describe('MenuItemsService', () => {
       expect(mockModel.create).toHaveBeenCalledWith(dto);
       expect(result).toEqual(created);
     });
+
+    it('should throw BadRequestException when restaurante_id does not exist', async () => {
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
+      const dto = {
+        restaurante_id: new Types.ObjectId().toString(),
+        nombre: 'Burger',
+        precio: 45,
+        categoria: 'principal' as const,
+      };
+
+      await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
+      await expect(service.create(dto as any)).rejects.toThrow('El restaurante referenciado no existe o está inactivo');
+      expect(mockModel.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when restaurante is inactive (activo: false)', async () => {
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
+      const dto = {
+        restaurante_id: new Types.ObjectId().toString(),
+        nombre: 'Burger',
+        precio: 45,
+        categoria: 'principal' as const,
+      };
+
+      await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
+      await expect(service.create(dto as any)).rejects.toThrow('El restaurante referenciado no existe o está inactivo');
+    });
   });
 
   // ── findAll ─────────────────────────────────────────────────────────────────
 
   describe('findAll', () => {
+    it('should filter by disponible:true by default when not specified', async () => {
+      const query = createMockQuery([]);
+      mockModel.find.mockReturnValue(query);
+
+      await service.findAll({});
+
+      const callArg = mockModel.find.mock.calls[0][0];
+      expect(callArg.disponible).toBe(true);
+    });
+
+    it('should allow overriding disponible to false', async () => {
+      const query = createMockQuery([]);
+      mockModel.find.mockReturnValue(query);
+
+      await service.findAll({ disponible: false });
+
+      const callArg = mockModel.find.mock.calls[0][0];
+      expect(callArg.disponible).toBe(false);
+    });
+
     it('should return items with default sort/skip/limit when no filters given', async () => {
       const items = [{ nombre: 'Item1' }];
       const query = createMockQuery(items);
@@ -86,7 +143,7 @@ describe('MenuItemsService', () => {
 
       const result = await service.findAll({});
 
-      expect(mockModel.find).toHaveBeenCalledWith({});
+      expect(mockModel.find).toHaveBeenCalledWith(expect.objectContaining({ disponible: true }));
       expect(query.sort).toHaveBeenCalledWith({ categoria: 1, nombre: 1 });
       expect(query.skip).toHaveBeenCalledWith(0);
       expect(query.limit).toHaveBeenCalledWith(50);

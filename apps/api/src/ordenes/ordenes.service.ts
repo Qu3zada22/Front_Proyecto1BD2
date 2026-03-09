@@ -3,48 +3,85 @@ import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import { Orden, OrdenDocument, EstadoOrden } from './schemas/orden.schema';
 import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
+import { Usuario } from '../usuarios/schemas/usuario.schema';
+import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
 import { CreateOrdenDto } from './dto/create-orden.dto';
 
 const ESTADOS_VALIDOS: EstadoOrden[] = [
     'pendiente', 'en_proceso', 'en_camino', 'entregado', 'cancelado',
 ];
 
+const TRANSICIONES: Record<string, string[]> = {
+    pendiente: ['en_proceso', 'cancelado'],
+    en_proceso: ['en_camino', 'cancelado'],
+    en_camino: ['entregado', 'cancelado'],
+    entregado: [],
+    cancelado: [],
+};
+
 @Injectable()
 export class OrdenesService {
     constructor(
         @InjectModel(Orden.name) private ordenModel: Model<OrdenDocument>,
         @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
+        @InjectModel(Usuario.name) private usuarioModel: Model<any>,
+        @InjectModel(Restaurante.name) private restauranteModel: Model<any>,
         @InjectConnection() private connection: Connection,
     ) { }
 
     // Transacción ACID: insert orden + bulkWrite $inc veces_ordenado
     async create(dto: CreateOrdenDto): Promise<OrdenDocument> {
-        // Mapear items: normalizar campos para consistencia con seed y aggregations
-        const itemsMapped = dto.items.map((i) => ({
-            item_id: new Types.ObjectId(i.menu_item_id),
-            menu_item_id: new Types.ObjectId(i.menu_item_id),
-            nombre: i.nombre,
-            precio_unitario: i.precio,
-            precio: i.precio,
-            cantidad: i.cantidad,
-            subtotal: i.precio * i.cantidad,
-            ...(i.notas && { notas: i.notas }),
-        }));
+        // OBS-01/02: Validar FK — usuario_id debe existir; restaurante_id debe existir y estar activo
+        const [userExists, restExists] = await Promise.all([
+            this.usuarioModel.countDocuments({ _id: dto.usuario_id }),
+            this.restauranteModel.countDocuments({ _id: dto.restaurante_id, activo: true }),
+        ]);
+        if (!userExists) throw new BadRequestException('El usuario referenciado no existe');
+        if (!restExists) throw new BadRequestException('El restaurante referenciado no existe o está inactivo');
 
-        const total = itemsMapped.reduce((sum, i) => sum + i.subtotal, 0);
         const session = await this.connection.startSession();
         session.startTransaction();
         try {
-            // Paso 1 (PDF spec): verificar disponible:true en todos los platillos
-            // Deduplicar IDs: $in deduplica en MongoDB, el length debe compararse contra únicos
-            const uniqueItemIds = [...new Set(itemsMapped.map(i => i.item_id.toHexString()))]
+            // Paso 1 (PDF spec): verificar disponible:true y leer precios reales
+            const uniqueItemIds = [...new Set(dto.items.map(i => new Types.ObjectId(i.menu_item_id).toHexString()))]
                 .map(hex => new Types.ObjectId(hex));
-            const disponibles = await this.menuItemModel
-                .find({ _id: { $in: uniqueItemIds }, disponible: true }, { _id: 1 }, { session })
+            const dbItems = await this.menuItemModel
+                .find(
+                    {
+                        _id: { $in: uniqueItemIds },
+                        disponible: true,
+                        // OBS-01: validar que todos los items pertenezcan a este restaurante
+                        restaurante_id: new Types.ObjectId(dto.restaurante_id),
+                    },
+                    { _id: 1, nombre: 1, precio: 1 },
+                    { session },
+                )
                 .lean();
-            if (disponibles.length !== uniqueItemIds.length) {
-                throw new BadRequestException('Uno o más platillos no están disponibles');
+            if (dbItems.length !== uniqueItemIds.length) {
+                throw new BadRequestException(
+                    'Uno o más platillos no están disponibles o no pertenecen a este restaurante',
+                );
             }
+
+            // Paso 2 (PDF spec): recalcular snapshot con precios actuales de BD
+            const dbMap = new Map((dbItems as any[]).map(i => [i._id.toHexString(), i]));
+            const itemsMapped = dto.items.map((i) => {
+                const dbItem = dbMap.get(new Types.ObjectId(i.menu_item_id).toHexString())!;
+                // BUG-01: parseFloat convierte Decimal128 (seed) y number (API) por igual
+                // .lean() devuelve Decimal128 objects sin type-casting; aritmética directa da NaN
+                const precio = parseFloat((dbItem as any).precio?.toString() ?? '0');
+                return {
+                    item_id: new Types.ObjectId(i.menu_item_id),
+                    menu_item_id: new Types.ObjectId(i.menu_item_id),
+                    nombre: (dbItem as any).nombre,
+                    precio_unitario: precio,
+                    precio: precio,
+                    cantidad: i.cantidad,
+                    subtotal: precio * i.cantidad,
+                    ...(i.notas && { notas: i.notas }),
+                };
+            });
+            const total = itemsMapped.reduce((sum, i) => sum + i.subtotal, 0);
 
             const [orden] = await this.ordenModel.create(
                 [{ ...dto, items: itemsMapped, total }] as any[],
@@ -116,6 +153,16 @@ export class OrdenesService {
             throw new BadRequestException(`Estado inválido. Válidos: ${ESTADOS_VALIDOS.join(', ')}`);
         }
 
+        // Validar transición legal desde el estado actual
+        const orden = await this.ordenModel.findById(id).select('estado').lean().exec();
+        if (!orden) throw new NotFoundException('Orden no encontrada');
+        const permitidos = TRANSICIONES[(orden as any).estado] ?? [];
+        if (!permitidos.includes(estado)) {
+            throw new BadRequestException(
+                `Transición inválida: ${(orden as any).estado} → ${estado}. Permitidos: ${permitidos.join(', ') || 'ninguno (estado terminal)'}`,
+            );
+        }
+
         const histEntry: any = {
             estado,
             timestamp: new Date(),
@@ -125,7 +172,8 @@ export class OrdenesService {
 
         const update: any = {
             $set: { estado },
-            $push: { historial_estados: histEntry },
+            // $each + $slice:-5 mantiene el array acotado en máximo 5 transiciones (diseño)
+            $push: { historial_estados: { $each: [histEntry], $slice: -5 } },
         };
 
         if (estado === 'entregado') {
@@ -133,20 +181,72 @@ export class OrdenesService {
         }
 
         const updated = await this.ordenModel
-            .findByIdAndUpdate(id, update, { new: true })
+            .findOneAndUpdate(
+                { _id: id, estado: (orden as any).estado },
+                update,
+                { new: true },
+            )
             .exec();
-        if (!updated) throw new NotFoundException('Orden no encontrada');
+        if (!updated) throw new BadRequestException('Conflicto: el estado de la orden cambió entre lectura y escritura (reintente)');
         return updated;
     }
 
     async remove(id: string): Promise<{ deleted: boolean }> {
-        const result = await this.ordenModel.findByIdAndDelete(id).exec();
-        if (!result) throw new NotFoundException('Orden no encontrada');
-        return { deleted: true };
+        const session = await this.connection.startSession();
+        session.startTransaction();
+        try {
+            const orden = await this.ordenModel.findByIdAndDelete(id, { session }).exec();
+            if (!orden) throw new NotFoundException('Orden no encontrada');
+
+            // Decrementar veces_ordenado en cada menu_item
+            const bulkOps = (orden.items || []).map((item: any) => ({
+                updateOne: {
+                    filter: { _id: item.item_id || item.menu_item_id },
+                    update: { $inc: { veces_ordenado: -(item.cantidad || 0) } },
+                },
+            }));
+            if (bulkOps.length) {
+                await this.menuItemModel.bulkWrite(bulkOps as any[], { session } as any);
+            }
+
+            await session.commitTransaction();
+            return { deleted: true };
+        } catch (err) {
+            await session.abortTransaction();
+            throw err;
+        } finally {
+            await session.endSession();
+        }
     }
 
     async removeMany(ids: string[]): Promise<{ deleted: number }> {
-        const result = await this.ordenModel.deleteMany({ _id: { $in: ids } }).exec();
-        return { deleted: result.deletedCount };
+        const session = await this.connection.startSession();
+        session.startTransaction();
+        try {
+            const ordenes = await this.ordenModel.find({ _id: { $in: ids } }).select('items').lean().session(session).exec();
+
+            const result = await this.ordenModel.deleteMany({ _id: { $in: ids } }).session(session).exec();
+
+            // Decrementar veces_ordenado para todas las órdenes eliminadas
+            const bulkOps = ordenes.flatMap((orden: any) =>
+                (orden.items || []).map((item: any) => ({
+                    updateOne: {
+                        filter: { _id: item.item_id || item.menu_item_id },
+                        update: { $inc: { veces_ordenado: -(item.cantidad || 0) } },
+                    },
+                })),
+            );
+            if (bulkOps.length) {
+                await this.menuItemModel.bulkWrite(bulkOps as any[], { session } as any);
+            }
+
+            await session.commitTransaction();
+            return { deleted: result.deletedCount };
+        } catch (err) {
+            await session.abortTransaction();
+            throw err;
+        } finally {
+            await session.endSession();
+        }
     }
 }
