@@ -23,6 +23,7 @@ export class ReportesService {
         return this.ordenModel.aggregate([
             { $group: { _id: '$estado', total: { $sum: 1 } } },
             { $sort: { total: -1 } },
+            { $project: { estado: '$_id', total: 1, _id: 0 } },
         ]);
     }
 
@@ -38,6 +39,7 @@ export class ReportesService {
     async usuariosPorRol(): Promise<any[]> {
         return this.usuarioModel.aggregate([
             { $group: { _id: '$rol', total: { $sum: 1 } } },
+            { $project: { rol: '$_id', total: 1, _id: 0 } },
         ]);
     }
 
@@ -155,6 +157,7 @@ export class ReportesService {
             { $unwind: '$categorias' },
             { $group: { _id: '$categorias', total: { $sum: 1 } } },
             { $sort: { total: -1 } },
+            { $project: { categoria: '$_id', total: 1, _id: 0 } },
         ]);
     }
 

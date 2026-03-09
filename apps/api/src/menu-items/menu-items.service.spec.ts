@@ -95,8 +95,21 @@ describe('MenuItemsService', () => {
       };
 
       await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
-      await expect(service.create(dto as any)).rejects.toThrow('El restaurante referenciado no existe');
+      await expect(service.create(dto as any)).rejects.toThrow('El restaurante referenciado no existe o está inactivo');
       expect(mockModel.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when restaurante is inactive (activo: false)', async () => {
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
+      const dto = {
+        restaurante_id: new Types.ObjectId().toString(),
+        nombre: 'Burger',
+        precio: 45,
+        categoria: 'principal' as const,
+      };
+
+      await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
+      await expect(service.create(dto as any)).rejects.toThrow('El restaurante referenciado no existe o está inactivo');
     });
   });
 

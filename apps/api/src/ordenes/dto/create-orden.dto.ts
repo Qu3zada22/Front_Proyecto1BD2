@@ -14,11 +14,11 @@ class ItemOrdenDto {
     @ApiProperty({ example: '64a1b2c3d4e5f6a7b8c9d0e1', description: 'ID del MenuItem' })
     @IsString() menu_item_id: string;
 
-    @ApiProperty({ example: 'Clásica Burger' })
-    @IsString() nombre: string;
+    @ApiPropertyOptional({ example: 'Clásica Burger', description: 'Ignorado — el nombre real se lee de la BD' })
+    @IsOptional() @IsString() nombre?: string;
 
-    @ApiProperty({ example: 45.00, minimum: 0 })
-    @IsNumber() @Min(0) precio: number;
+    @ApiPropertyOptional({ example: 45.00, minimum: 0, description: 'Ignorado — el precio real se lee de la BD' })
+    @IsOptional() @IsNumber() @Min(0) precio?: number;
 
     @ApiProperty({ example: 2, minimum: 1 })
     @IsNumber() @Min(1) cantidad: number;

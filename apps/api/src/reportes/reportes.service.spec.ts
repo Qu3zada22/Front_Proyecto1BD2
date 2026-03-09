@@ -51,10 +51,10 @@ describe('ReportesService', () => {
   // ── ordenesPorEstado ─────────────────────────────────────────────────────────
 
   describe('ordenesPorEstado', () => {
-    it('should aggregate ordenes grouped by estado', async () => {
+    it('should aggregate ordenes grouped by estado and rename _id to estado in output', async () => {
       const expected = [
-        { _id: 'entregado', total: 300 },
-        { _id: 'pendiente', total: 50 },
+        { estado: 'entregado', total: 300 },
+        { estado: 'pendiente', total: 50 },
       ];
       mockOrdenModel.aggregate.mockResolvedValue(expected);
 
@@ -69,6 +69,8 @@ describe('ReportesService', () => {
       });
       // Must sort by total descending
       expect(pipeline[1]).toEqual({ $sort: { total: -1 } });
+      // Must project _id → estado (OBS-04)
+      expect(pipeline[2]).toEqual({ $project: { estado: '$_id', total: 1, _id: 0 } });
       expect(result).toEqual(expected);
     });
   });
@@ -112,11 +114,11 @@ describe('ReportesService', () => {
   // ── usuariosPorRol ───────────────────────────────────────────────────────────
 
   describe('usuariosPorRol', () => {
-    it('should aggregate usuarios grouped by rol', async () => {
+    it('should aggregate usuarios grouped by rol and rename _id to rol in output', async () => {
       const expected = [
-        { _id: 'cliente', total: 25 },
-        { _id: 'propietario', total: 5 },
-        { _id: 'admin', total: 1 },
+        { rol: 'cliente', total: 25 },
+        { rol: 'propietario', total: 5 },
+        { rol: 'admin', total: 1 },
       ];
       mockUsuarioModel.aggregate.mockResolvedValue(expected);
 
@@ -126,6 +128,8 @@ describe('ReportesService', () => {
       expect(pipeline[0]).toEqual({
         $group: { _id: '$rol', total: { $sum: 1 } },
       });
+      // Must project _id → rol (OBS-04)
+      expect(pipeline[1]).toEqual({ $project: { rol: '$_id', total: 1, _id: 0 } });
       expect(result).toEqual(expected);
     });
   });
@@ -514,10 +518,10 @@ describe('ReportesService', () => {
   // ── restaurantesPorCategoria ──────────────────────────────────────────────────
 
   describe('restaurantesPorCategoria', () => {
-    it('should unwind categorias array and group by categoria', async () => {
+    it('should unwind categorias array, group by categoria and rename _id to categoria in output', async () => {
       const expected = [
-        { _id: 'italiana', total: 5 },
-        { _id: 'mexicana', total: 3 },
+        { categoria: 'italiana', total: 5 },
+        { categoria: 'mexicana', total: 3 },
       ];
       mockRestauranteModel.aggregate.mockResolvedValue(expected);
 
@@ -536,6 +540,9 @@ describe('ReportesService', () => {
 
       // Stage 2: sort by total descending
       expect(pipeline[2]).toEqual({ $sort: { total: -1 } });
+
+      // Stage 3: project _id → categoria (OBS-03)
+      expect(pipeline[3]).toEqual({ $project: { categoria: '$_id', total: 1, _id: 0 } });
 
       expect(result).toEqual(expected);
     });

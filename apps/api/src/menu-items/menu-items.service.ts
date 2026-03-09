@@ -14,8 +14,8 @@ export class MenuItemsService {
     ) { }
 
     async create(dto: CreateMenuItemDto): Promise<MenuItemDocument> {
-        const restExists = await this.restauranteModel.countDocuments({ _id: dto.restaurante_id });
-        if (!restExists) throw new BadRequestException('El restaurante referenciado no existe');
+        const restExists = await this.restauranteModel.countDocuments({ _id: dto.restaurante_id, activo: true });
+        if (!restExists) throw new BadRequestException('El restaurante referenciado no existe o está inactivo');
         return this.menuItemModel.create(dto);
     }
 
