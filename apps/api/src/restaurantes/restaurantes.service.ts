@@ -38,7 +38,6 @@ export class RestaurantesService {
             .sort(sort)
             .skip(skip)
             .limit(limit)
-            .select('-horario')
             .lean()
             .exec() as Promise<RestauranteDocument[]>;
     }
