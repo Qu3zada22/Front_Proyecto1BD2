@@ -118,7 +118,7 @@ describe('UsuariosService', () => {
   // ── findAll ─────────────────────────────────────────────────────────────────
 
   describe('findAll', () => {
-    it('should return users excluding password field, sorted by fecha_registro desc', async () => {
+    it('should return users excluding password field, sorted by fecha_registro desc, with default pagination', async () => {
       const users = [{ nombre: 'Juan' }, { nombre: 'Ana' }];
       const query = createMockQuery(users);
       mockModel.find.mockReturnValue(query);
@@ -128,9 +128,21 @@ describe('UsuariosService', () => {
       expect(mockModel.find).toHaveBeenCalledWith({});
       expect(query.select).toHaveBeenCalledWith('-password');
       expect(query.sort).toHaveBeenCalledWith({ fecha_registro: -1 });
+      expect(query.skip).toHaveBeenCalledWith(0);
+      expect(query.limit).toHaveBeenCalledWith(50);
       expect(query.lean).toHaveBeenCalled();
       expect(query.exec).toHaveBeenCalled();
       expect(result).toEqual(users);
+    });
+
+    it('should apply custom skip and limit when provided', async () => {
+      const query = createMockQuery([]);
+      mockModel.find.mockReturnValue(query);
+
+      await service.findAll({ skip: 10, limit: 5 });
+
+      expect(query.skip).toHaveBeenCalledWith(10);
+      expect(query.limit).toHaveBeenCalledWith(5);
     });
 
     it('should filter by rol when provided', async () => {

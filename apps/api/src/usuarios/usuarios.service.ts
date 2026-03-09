@@ -22,14 +22,21 @@ export class UsuariosService {
         return this.usuarioModel.create(data);
     }
 
-    async findAll(query: { rol?: string; email?: string } = {}): Promise<any[]> {
+    async findAll(query: { rol?: string; email?: string; skip?: number; limit?: number } = {}): Promise<any[]> {
         const filter: any = {};
         if (query.rol) filter.rol = query.rol;
         if (query.email) {
             const escaped = query.email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             filter.email = new RegExp(escaped, 'i');
         }
-        return this.usuarioModel.find(filter).select('-password').sort({ fecha_registro: -1 }).lean().exec();
+        return this.usuarioModel
+            .find(filter)
+            .select('-password')
+            .sort({ fecha_registro: -1 })
+            .skip(query.skip ?? 0)
+            .limit(query.limit ?? 50)
+            .lean()
+            .exec();
     }
 
     async login(email: string): Promise<any> {
