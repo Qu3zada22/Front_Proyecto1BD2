@@ -52,3 +52,5 @@ export const UsuarioSchema = SchemaFactory.createForClass(Usuario);
 UsuarioSchema.index({ email: 1 }, { unique: true, name: 'idx_usuarios_email' });
 // Compuesto: filtrar usuarios activos por rol
 UsuarioSchema.index({ rol: 1, activo: 1 }, { name: 'idx_usuarios_rol_activo' });
+// Multikey: filtrar/sugerir por preferencias alimentarias ['vegano','sin_gluten',...]
+UsuarioSchema.index({ preferencias: 1 }, { name: 'idx_usuarios_preferencias' });

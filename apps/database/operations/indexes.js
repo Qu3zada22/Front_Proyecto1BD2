@@ -21,6 +21,8 @@ async function createUserIndexes(db) {
     col.createIndex({ nombre: 'text' }, { name: 'nombre_text' }),
     // Simple sobre rol
     col.createIndex({ rol: 1 }, { name: 'rol_simple' }),
+    // Multikey sobre preferencias alimentarias ['vegano','sin_gluten',...]
+    col.createIndex({ preferencias: 1 }, { name: 'idx_usuarios_preferencias' }),
   ])
   console.log('  [OK] usuarios indexes')
 }
@@ -98,6 +100,8 @@ async function createReviewIndexes(db) {
     col.createIndex({ titulo: 'text', comentario: 'text' }, { name: 'titulo_comentario_text' }),
     // Simple sobre orden_id
     col.createIndex({ orden_id: 1 }, { name: 'orden_id_simple' }),
+    // Multikey sobre likes (array de ObjectIds de usuarios)
+    col.createIndex({ likes: 1 }, { name: 'idx_resenas_likes' }),
   ])
   console.log('  [OK] resenas indexes')
 }

@@ -55,3 +55,5 @@ ResenaSchema.index(
     { titulo: 'text', comentario: 'text' },
     { name: 'idx_resenas_text' },
 );
+// Multikey: filtrar reseñas por usuario que dio like ($addToSet / $pull)
+ResenaSchema.index({ likes: 1 }, { name: 'idx_resenas_likes' });
