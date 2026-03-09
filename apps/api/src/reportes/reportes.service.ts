@@ -177,7 +177,13 @@ export class ReportesService {
                         $concat: [
                             { $toString: '$_id.anio' },
                             '-',
-                            { $toString: '$_id.mes' },
+                            {
+                                $cond: [
+                                    { $lt: ['$_id.mes', 10] },
+                                    { $concat: ['0', { $toString: '$_id.mes' }] },
+                                    { $toString: '$_id.mes' },
+                                ],
+                            },
                         ],
                     },
                     restaurante: { $arrayElemAt: ['$restaurante.nombre', 0] },

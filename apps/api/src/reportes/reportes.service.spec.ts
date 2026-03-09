@@ -387,6 +387,89 @@ describe('ReportesService', () => {
     });
   });
 
+  // ── ingresosPorRestaurantePorMes ──────────────────────────────────────────────
+
+  describe('ingresosPorRestaurantePorMes', () => {
+    it('should group by restaurante_id, year and month', async () => {
+      mockOrdenModel.aggregate.mockResolvedValue([]);
+
+      await service.ingresosPorRestaurantePorMes();
+
+      const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
+      const groupStage = pipeline.find((s: any) => s.$group !== undefined);
+
+      expect(groupStage).toBeDefined();
+      expect(groupStage.$group._id).toMatchObject({
+        restaurante_id: '$restaurante_id',
+        anio: { $year: '$fecha_creacion' },
+        mes: { $month: '$fecha_creacion' },
+      });
+    });
+
+    it('should sum total_ingresos using $toDouble on total (Decimal128 compat)', async () => {
+      mockOrdenModel.aggregate.mockResolvedValue([]);
+
+      await service.ingresosPorRestaurantePorMes();
+
+      const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
+      const groupStage = pipeline.find((s: any) => s.$group !== undefined);
+
+      expect(groupStage.$group.total_ingresos).toEqual({
+        $sum: { $toDouble: '$total' },
+      });
+    });
+
+    it('should include $lookup to restaurantes collection', async () => {
+      mockOrdenModel.aggregate.mockResolvedValue([]);
+
+      await service.ingresosPorRestaurantePorMes();
+
+      const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
+      const lookupStage = pipeline.find((s: any) => s.$lookup !== undefined);
+
+      expect(lookupStage).toBeDefined();
+      expect(lookupStage.$lookup.from).toBe('restaurantes');
+      expect(lookupStage.$lookup.localField).toBe('_id.restaurante_id');
+    });
+
+    it('should zero-pad single-digit months in periodo (e.g. "2025-01" not "2025-1")', async () => {
+      mockOrdenModel.aggregate.mockResolvedValue([]);
+
+      await service.ingresosPorRestaurantePorMes();
+
+      const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
+      const projectStage = pipeline.find((s: any) => s.$project !== undefined);
+
+      expect(projectStage).toBeDefined();
+      const periodo = projectStage.$project.periodo;
+
+      // Must use $concat with a $cond for zero-padding
+      expect(periodo.$concat).toBeDefined();
+      expect(periodo.$concat).toHaveLength(3); // ['year', '-', padded-month]
+
+      const paddedMonth = periodo.$concat[2];
+      // The third element must be a $cond expression (not a plain $toString)
+      expect(paddedMonth.$cond).toBeDefined();
+      // The condition must check $lt mes < 10
+      expect(paddedMonth.$cond[0]).toEqual({ $lt: ['$_id.mes', 10] });
+      // If < 10: prepend '0'
+      expect(paddedMonth.$cond[1]).toMatchObject({ $concat: ['0', expect.anything()] });
+    });
+
+    it('should sort by year desc, month desc, total_ingresos desc', async () => {
+      mockOrdenModel.aggregate.mockResolvedValue([]);
+
+      await service.ingresosPorRestaurantePorMes();
+
+      const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
+      const sortStage = pipeline.find((s: any) => s.$sort !== undefined);
+
+      expect(sortStage).toEqual({
+        $sort: { '_id.anio': -1, '_id.mes': -1, total_ingresos: -1 },
+      });
+    });
+  });
+
   // ── restaurantesPorCategoria ──────────────────────────────────────────────────
 
   describe('restaurantesPorCategoria', () => {
