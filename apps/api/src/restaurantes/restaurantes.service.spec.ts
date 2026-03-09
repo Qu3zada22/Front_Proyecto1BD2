@@ -329,7 +329,9 @@ describe('RestaurantesService', () => {
       // Solo pendiente/en_proceso — en_camino ya está en tránsito (diseño)
       expect(filter.estado.$in).toEqual(['pendiente', 'en_proceso']);
       expect(update.$set.estado).toBe('cancelado');
-      expect(update.$push.historial_estados).toMatchObject({ estado: 'cancelado' });
+      // $each+$slice:-5 mantiene el array acotado en máximo 5 transiciones (diseño)
+      expect(update.$push.historial_estados.$each[0]).toMatchObject({ estado: 'cancelado' });
+      expect(update.$push.historial_estados.$slice).toBe(-5);
       expect(opts).toMatchObject({ session: mockSession });
     });
 

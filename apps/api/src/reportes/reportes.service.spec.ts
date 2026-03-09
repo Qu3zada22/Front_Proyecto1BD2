@@ -280,7 +280,7 @@ describe('ReportesService', () => {
       expect(groupStage.$group.total_vendidos).toEqual({ $sum: '$items.cantidad' });
     });
 
-    it('should compute ingresos from items.subtotal using $toDouble', async () => {
+    it('should compute ingresos from items.subtotal using $toDecimal (preserva precisión Decimal128)', async () => {
       mockOrdenModel.aggregate.mockResolvedValue([]);
 
       await service.platillosMasVendidos();
@@ -289,7 +289,7 @@ describe('ReportesService', () => {
       const groupStage = pipeline.find((s: any) => s.$group !== undefined);
 
       expect(groupStage.$group.ingresos).toEqual({
-        $sum: { $toDouble: '$items.subtotal' },
+        $sum: { $toDecimal: '$items.subtotal' },
       });
     });
 
@@ -362,7 +362,7 @@ describe('ReportesService', () => {
       );
     });
 
-    it('should compute total_ingresos using $toDouble on total field', async () => {
+    it('should compute total_ingresos using $toDecimal on total field (preserva precisión Decimal128)', async () => {
       mockOrdenModel.aggregate.mockResolvedValue([]);
 
       await service.ingresosPorDia('2026-03-01', '2026-03-07');
@@ -371,11 +371,11 @@ describe('ReportesService', () => {
       const groupStage = pipeline.find((s: any) => s.$group !== undefined);
 
       expect(groupStage.$group.total_ingresos).toEqual({
-        $sum: { $toDouble: '$total' },
+        $sum: { $toDecimal: '$total' },
       });
     });
 
-    it('should compute ticket_promedio using $avg on total', async () => {
+    it('should compute ticket_promedio using $avg with $toDecimal on total', async () => {
       mockOrdenModel.aggregate.mockResolvedValue([]);
 
       await service.ingresosPorDia('2026-03-01', '2026-03-07');
@@ -384,7 +384,7 @@ describe('ReportesService', () => {
       const groupStage = pipeline.find((s: any) => s.$group !== undefined);
 
       expect(groupStage.$group.ticket_promedio).toEqual({
-        $avg: { $toDouble: '$total' },
+        $avg: { $toDecimal: '$total' },
       });
     });
 

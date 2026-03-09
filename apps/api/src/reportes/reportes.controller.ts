@@ -36,7 +36,7 @@ export class ReportesController {
     // ── Reportes complejos ───────────────────────────────────────────────────
 
     @Get('restaurants/top-rated')
-    @ApiOperation({ summary: 'Top restaurantes', description: 'Aggregation compleja: $lookup reseñas → $addFields calificacion_prom → $sort.' })
+    @ApiOperation({ summary: 'Top restaurantes', description: 'Aggregation compleja: parte de resenas (fuente de verdad) → $group avg/count → $match(≥5 reseñas) → $sort/$limit → $lookup restaurantes → $project.' })
     @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
     topRestaurantes(@Query('limit') limit: string) {
         return this.reportesService.topRestaurantes(+limit || 10);

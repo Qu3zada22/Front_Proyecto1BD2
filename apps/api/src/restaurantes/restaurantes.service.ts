@@ -110,7 +110,7 @@ export class RestaurantesService {
                     // Solo pendiente/en_proceso — en_camino ya está en tránsito (diseño)
                     estado: { $in: ['pendiente', 'en_proceso'] },
                 },
-                { $set: { estado: 'cancelado' }, $push: { historial_estados: histEntry } },
+                { $set: { estado: 'cancelado' }, $push: { historial_estados: { $each: [histEntry], $slice: -5 } } },
                 { session },
             );
 

@@ -99,7 +99,8 @@ export class ReportesService {
                     nombre: { $first: '$items.nombre' },
                     total_vendidos: { $sum: '$items.cantidad' },
                     ingresos: {
-                        $sum: { $toDouble: '$items.subtotal' },
+                        // $toDecimal preserva precisión Decimal128 antes de acumular (diseño)
+                        $sum: { $toDecimal: '$items.subtotal' },
                     },
                 },
             },
@@ -130,9 +131,10 @@ export class ReportesService {
             {
                 $group: {
                     _id: { $dateToString: { format: '%Y-%m-%d', date: '$fecha_creacion' } },
-                    total_ingresos: { $sum: { $toDouble: '$total' } },
+                    // $toDecimal preserva precisión Decimal128 antes de acumular (diseño)
+                    total_ingresos: { $sum: { $toDecimal: '$total' } },
                     total_ordenes: { $sum: 1 },
-                    ticket_promedio: { $avg: { $toDouble: '$total' } },
+                    ticket_promedio: { $avg: { $toDecimal: '$total' } },
                 },
             },
             { $sort: { _id: 1 } },
