@@ -1,98 +1,118 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# FastPochi — API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend REST del sistema de delivery de comida. Construido con **NestJS 11**, **Mongoose 9** y **MongoDB 8.2.5**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Stack
 
-## Description
+| Tecnología          | Versión  | Rol                              |
+|---------------------|----------|----------------------------------|
+| NestJS              | 11       | Framework HTTP                   |
+| Mongoose            | 9        | ODM para MongoDB                 |
+| @nestjs/mongoose    | 11       | Integración Mongoose + NestJS    |
+| class-validator     | latest   | Validación de DTOs               |
+| @nestjs/swagger     | latest   | Documentación OpenAPI            |
+| Jest                | 29       | Tests unitarios                  |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Correr en desarrollo
 
 ```bash
-$ npm install
+# Desde apps/api/ (necesita .env en este directorio)
+npm run dev
+
+# Desde la raíz del monorepo
+npm run dev    # Turborepo levanta API + Frontend en paralelo
 ```
 
-## Compile and run the project
+La API queda disponible en:
+- **REST API:** `http://localhost:3000/api`
+- **Swagger UI:** `http://localhost:3000/docs` (solo en `NODE_ENV=development`)
+
+## Variables de entorno
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+cp .env.example .env
 ```
 
-## Run tests
+```env
+MONGODB_URI=mongodb://localhost:27017/fastpochi?directConnection=true
+PORT=3000
+NODE_ENV=development
+```
+
+> `directConnection=true` es necesario cuando MongoDB corre en Docker con replica set. El driver no puede resolver el hostname interno (`mongo:27017`) desde el host.
+
+## Tests
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm run test           # 242 tests, 11 suites
+npm run test:watch     # modo watch
+npm run test:cov       # con reporte de cobertura
 ```
 
-## Deployment
+| Suite                              | Tests |
+|------------------------------------|-------|
+| `restaurantes.service.spec.ts`     | 25    |
+| `menu-items.service.spec.ts`       | 22    |
+| `ordenes.service.spec.ts`          | 36    |
+| `resenas.service.spec.ts`          | 32    |
+| `usuarios.service.spec.ts`         | 27    |
+| `reportes.service.spec.ts`         | 39    |
+| `files.service.spec.ts`            | 23    |
+| `seed.service.spec.ts`             | 6     |
+| `http-exception.filter.spec.ts`    | 8     |
+| `response.interceptor.spec.ts`     | 18    |
+| `parse-mongo-id.pipe.spec.ts`      | 6     |
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Estructura
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+```
+src/
+├── common/
+│   ├── dto/pagination.dto.ts
+│   ├── filters/http-exception.filter.ts   ← maneja Mongo errors (11000, CastError)
+│   ├── interceptors/response.interceptor.ts ← respuesta uniforme + Decimal128 → number
+│   └── pipes/parse-mongo-id.pipe.ts       ← valida ObjectId en rutas
+├── usuarios/
+├── restaurantes/
+├── menu-items/
+├── ordenes/       ← transacción ACID en create()
+├── resenas/
+├── reportes/      ← 8 aggregation pipelines
+├── files/         ← GridFS (upload/download/delete)
+├── seed/          ← 50k docs vía bulkWrite
+├── app.module.ts
+└── main.ts
+```
+
+## Respuesta uniforme
+
+Todas las respuestas pasan por `ResponseInterceptor`:
+
+```json
+{ "success": true,  "data": ..., "timestamp": "2026-03-10T..." }
+{ "success": false, "statusCode": 400, "message": "...", "path": "/api/..." }
+```
+
+Los campos `Decimal128` de MongoDB se convierten automáticamente a `number` en la serialización.
+
+## Endpoints
+
+Documentación interactiva completa en **`/docs`** (Swagger). Resumen:
+
+| Módulo        | Prefijo              | Operaciones principales                                      |
+|---------------|----------------------|--------------------------------------------------------------|
+| Usuarios      | `/api/users`         | CRUD, login, $push/$pull en direcciones                     |
+| Restaurantes  | `/api/restaurants`   | CRUD, filtro geoespacial $near, búsqueda por texto          |
+| Menú          | `/api/menu-items`    | CRUD, updateMany disponibilidad, $addToSet/$pull en tags    |
+| Órdenes       | `/api/orders`        | CRUD con transacción ACID, cambio de estado                 |
+| Reseñas       | `/api/reviews`       | Create/delete, $addToSet/$pull en likes                     |
+| Reportes      | `/api/reports`       | 8 aggregation pipelines (revenue, top rated, best sellers…) |
+| Archivos      | `/api/files`         | GridFS upload/download/delete/list                          |
+| Seed          | `/api/seed`          | POST (poblar) / DELETE (limpiar)                            |
+
+## Build
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run build        # compila a dist/
+npm run start:prod   # corre el build compilado
 ```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).

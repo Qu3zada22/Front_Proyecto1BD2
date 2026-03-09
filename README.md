@@ -116,6 +116,24 @@ Para limpiar:
 curl -X DELETE http://localhost:3000/api/seed
 ```
 
+### 7. Scripts de base de datos (apps/database)
+
+Requieren `.env` con `MONGODB_URI` en `apps/database/`:
+
+```bash
+cp apps/database/.env.example apps/database/.env
+```
+
+```bash
+# Ingesta directa (alternativa al endpoint /api/seed)
+cd apps/database && npm run ingest
+
+# Verifica la DB: explain() por tipo de índice, pipelines, operadores de arrays
+cd apps/database && npm run verify
+```
+
+`verify.js` demuestra los 4 tipos de índice con `explain()`, los 8 pipelines complejos, operadores `$push`/`$pull`/`$addToSet` y GridFS.
+
 ---
 
 ## Producción (Docker Compose)
@@ -183,16 +201,21 @@ npm run lint         # ESLint
 
 ## Tests
 
-**105 tests unitarios, 6 suites — 100% de cobertura en services:**
+**242 tests unitarios, 11 suites — 100% de cobertura en services:**
 
-| Suite                          | Tests | Qué cubre                                    |
-|--------------------------------|-------|----------------------------------------------|
-| `restaurantes.service.spec.ts` | 15    | CRUD, filtros, búsqueda geoespacial          |
-| `menu-items.service.spec.ts`   | 18    | CRUD, updateMany, $addToSet/$pull en tags    |
-| `ordenes.service.spec.ts`      | 20    | Transacción ACID, filtros, deleteMany        |
-| `resenas.service.spec.ts`      | 11    | Create, findByRestaurant con sort/pagination |
-| `usuarios.service.spec.ts`     | 22    | CRUD, login, $push/$pull en direcciones      |
-| `reportes.service.spec.ts`     | 19    | Todos los aggregation pipelines              |
+| Suite                              | Tests | Qué cubre                                             |
+|------------------------------------|-------|-------------------------------------------------------|
+| `restaurantes.service.spec.ts`     | 25    | CRUD, filtros, búsqueda geoespacial, cancelar         |
+| `menu-items.service.spec.ts`       | 22    | CRUD, updateMany, $addToSet/$pull en tags, activo:true|
+| `ordenes.service.spec.ts`          | 36    | Transacción ACID, FK validation, Decimal128, deleteMany|
+| `resenas.service.spec.ts`          | 32    | Create/remove, likes $addToSet/$pull, paginación      |
+| `usuarios.service.spec.ts`         | 27    | CRUD, login, $push/$pull en direcciones, paginación   |
+| `reportes.service.spec.ts`         | 39    | Todos los aggregation pipelines (8 reportes)          |
+| `files.service.spec.ts`            | 23    | GridFS upload/download/delete/list, MIME detection    |
+| `seed.service.spec.ts`             | 6     | Seed (50k docs bulkWrite) y clear DB                  |
+| `http-exception.filter.spec.ts`    | 8     | Manejo de errores HTTP (Mongo, Cast, genéricos)       |
+| `response.interceptor.spec.ts`     | 18    | Respuesta uniforme + conversión Decimal128 → number   |
+| `parse-mongo-id.pipe.spec.ts`      | 6     | Validación de ObjectId en parámetros de ruta          |
 
 ---
 
@@ -206,22 +229,31 @@ npm run lint         # ESLint
 | `ordenes`     | Pedidos con items embedded (snapshot de precio)| → `usuarios`, `restaurantes` |
 | `resenas`     | Calificaciones y comentarios                   | → `usuarios`, `restaurantes` |
 
-### Índices
+### Índices (34 en total — 4 tipos cubiertos para la rúbrica)
 
-| Colección     | Campo(s)                              | Tipo                   |
-|---------------|---------------------------------------|------------------------|
-| `usuarios`    | `email`                               | Simple (unique)        |
-| `usuarios`    | `rol + activo`                        | Compuesto              |
-| `restaurantes`| `nombre + activo`                     | Compuesto              |
-| `restaurantes`| `ubicacion`                           | Geoespacial (2dsphere) |
-| `restaurantes`| `nombre, descripcion`                 | Texto                  |
-| `restaurantes`| `categorias`                          | Multikey               |
-| `menu_items`  | `restaurante_id + disponible`         | Compuesto              |
-| `menu_items`  | `etiquetas`                           | Multikey               |
-| `ordenes`     | `usuario_id + estado + createdAt`     | Compuesto              |
-| `ordenes`     | `restaurante_id + estado + createdAt` | Compuesto              |
-| `resenas`     | `restaurante_id + calificacion`       | Compuesto              |
-| `resenas`     | `cliente_id + restaurante_id`         | Compuesto (unique)     |
+| Colección     | Campo(s)                                      | Tipo                   |
+|---------------|-----------------------------------------------|------------------------|
+| `usuarios`    | `email`                                       | Simple (unique)        |
+| `usuarios`    | `nombre`                                      | Texto                  |
+| `usuarios`    | `direcciones.ciudad`                          | Multikey               |
+| `usuarios`    | `rol + activo`                                | Compuesto              |
+| `usuarios`    | `preferencias`                                | Multikey               |
+| `restaurantes`| `ubicacion`                                   | Geoespacial (2dsphere) |
+| `restaurantes`| `nombre, descripcion`                         | Texto                  |
+| `restaurantes`| `categorias`                                  | Multikey               |
+| `restaurantes`| `propietario_id + activo`                     | Compuesto              |
+| `restaurantes`| `nombre + activo`                             | Compuesto              |
+| `menu_items`  | `restaurante_id + categoria + disponible`     | Compuesto ESR          |
+| `menu_items`  | `etiquetas`                                   | Multikey               |
+| `menu_items`  | `nombre, descripcion`                         | Texto                  |
+| `ordenes`     | `usuario_id + estado + fecha_creacion`        | Compuesto ESR          |
+| `ordenes`     | `restaurante_id + estado + fecha_creacion`    | Compuesto ESR          |
+| `ordenes`     | `items.item_id`                               | Multikey               |
+| `resenas`     | `restaurante_id + calificacion`               | Compuesto              |
+| `resenas`     | `tags`                                        | Multikey               |
+| `resenas`     | `titulo, comentario`                          | Texto                  |
+| `resenas`     | `activa`                                      | Simple                 |
+| `resenas`     | `likes`                                       | Multikey               |
 
 ---
 
