@@ -1,33 +1,36 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Logo } from "@/components/fastpochi/logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { useAuth } from "@/lib/store"
-import { usuarios } from "@/lib/mock-data"
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, user } = useAuth()
   const [email, setEmail] = useState("")
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    const ok = login(email, "")
-    if (!ok) { setError(true); return }
-    const user = usuarios.find((u) => u.email === email)
-    if (user?.rol === "admin") navigate("/admin")
-    else if (user?.rol === "propietario") navigate("/propietario")
+  useEffect(() => {
+    if (!user) return
+    const rol = (user as { rol: string }).rol
+    if (rol === "admin") navigate("/admin")
+    else if (rol === "propietario") navigate("/propietario")
     else navigate("/cliente")
-  }
+  }, [user, navigate])
 
-  // Quick login buttons for demo
-  const demoUsers = [
-    { label: "Cliente", email: usuarios.find((u) => u.rol === "cliente")?.email || "" },
-    { label: "Propietario", email: usuarios.find((u) => u.rol === "propietario")?.email || "" },
-    { label: "Admin", email: usuarios.find((u) => u.rol === "admin")?.email || "" },
-  ]
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) return
+    setLoading(true)
+    setError(null)
+    const result = await login(email)
+    setLoading(false)
+    if (!result.ok) {
+      setError(result.error ?? "Usuario no encontrado")
+    }
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -39,43 +42,22 @@ export default function LoginPage() {
         <Card className="border-0 shadow-lg">
           <CardHeader className="pb-2 text-center">
             <h1 className="text-xl font-semibold text-foreground">Iniciar Sesion</h1>
-            <p className="text-sm text-muted-foreground">Selecciona un usuario de demo</p>
+            <p className="text-sm text-muted-foreground">Ingresa tu correo para continuar</p>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            {demoUsers.map((u) => (
-              <Button
-                key={u.label}
-                variant="outline"
-                className="w-full justify-start gap-2"
-                onClick={() => {
-                  const ok = login(u.email, "")
-                  if (ok) {
-                    if (u.label === "Admin") navigate("/admin")
-                    else if (u.label === "Propietario") navigate("/propietario")
-                    else navigate("/cliente")
-                  }
-                }}
-              >
-                <span className="font-medium">{u.label}</span>
-                <span className="text-xs text-muted-foreground">{u.email}</span>
-              </Button>
-            ))}
-
-            <div className="relative my-2">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs text-muted-foreground"><span className="bg-card px-2">o ingresa tu email</span></div>
-            </div>
-
-            <form onSubmit={handleLogin} className="flex flex-col gap-3">
+            <form onSubmit={handleFormSubmit} className="flex flex-col gap-3">
               <input
                 type="email"
                 value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(false) }}
+                onChange={(e) => { setEmail(e.target.value); setError(null) }}
                 placeholder="correo@ejemplo.com"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                disabled={loading}
               />
-              {error && <p className="text-xs text-destructive">Usuario no encontrado</p>}
-              <Button type="submit" className="w-full">Entrar</Button>
+              {error && <p className="text-xs text-destructive">{error}</p>}
+              <Button type="submit" className="w-full" disabled={loading || !email}>
+                {loading ? "Ingresando..." : "Entrar"}
+              </Button>
             </form>
           </CardContent>
         </Card>

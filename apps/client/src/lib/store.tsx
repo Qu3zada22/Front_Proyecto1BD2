@@ -13,14 +13,15 @@ import {
   type EstadoOrden,
   type ItemOrden,
 } from "./mock-data"
+import { loginByEmail, type UsuarioAPI } from "@/services/usuarios"
 
 // ============================================================
 // Auth Context
 // ============================================================
 
 interface AuthContextType {
-  user: Usuario | null
-  login: (email: string, password: string) => boolean
+  user: Usuario | UsuarioAPI | null
+  login: (email: string) => Promise<{ ok: boolean; error?: string }>
   logout: () => void
   register: (data: Partial<Usuario>) => boolean
 }
@@ -28,17 +29,18 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<Usuario | null>(null)
+  const [user, setUser] = useState<Usuario | UsuarioAPI | null>(null)
   const [allUsers, setAllUsers] = useState<Usuario[]>(usuariosData)
 
-  const login = useCallback((email: string, _password: string) => {
-    const found = allUsers.find((u) => u.email === email && u.activo)
-    if (found) {
-      setUser(found)
-      return true
+  const login = useCallback(async (email: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const apiUser = await loginByEmail(email)
+      setUser(apiUser)
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "Error al iniciar sesión" }
     }
-    return false
-  }, [allUsers])
+  }, [])
 
   const logout = useCallback(() => {
     setUser(null)

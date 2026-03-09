@@ -13,6 +13,11 @@ export class UsuariosController {
         return this.usuariosService.create(dto);
     }
 
+    @Post('login')
+    login(@Body('email') email: string) {
+        return this.usuariosService.findByEmail(email);
+    }
+
     @Get(':id')
     findOne(@Param('id', ParseMongoIdPipe) id: string) {
         return this.usuariosService.findOne(id);
