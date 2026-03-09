@@ -18,10 +18,11 @@ export class MenuItemsController {
     }
 
     @Get()
-    @ApiOperation({ summary: 'Listar platillos', description: 'Filtra por restaurante, categoría o etiqueta.' })
+    @ApiOperation({ summary: 'Listar platillos', description: 'Filtra por restaurante, categoría, etiqueta o disponibilidad. Por defecto solo devuelve platillos disponibles.' })
     @ApiQuery({ name: 'restaurante_id', required: false, description: 'ObjectId del restaurante' })
     @ApiQuery({ name: 'categoria', required: false, enum: ['entrada', 'principal', 'postre', 'bebida', 'extra'] })
     @ApiQuery({ name: 'etiqueta', required: false, description: 'Filtrar por etiqueta (índice multikey)' })
+    @ApiQuery({ name: 'disponible', required: false, type: Boolean, description: 'Filtrar por disponibilidad (default: true). Usar false para ver todos.' })
     @ApiQuery({ name: 'skip', required: false, type: Number })
     @ApiQuery({ name: 'limit', required: false, type: Number })
     findAll(
@@ -29,8 +30,10 @@ export class MenuItemsController {
         @Query('restaurante_id') restauranteId?: string,
         @Query('categoria') categoria?: string,
         @Query('etiqueta') etiqueta?: string,
+        @Query('disponible') disponible?: string,
     ) {
-        return this.menuItemsService.findAll({ ...pagination, restaurante_id: restauranteId, categoria, etiqueta });
+        const disponibleBool = disponible === undefined ? undefined : disponible === 'true';
+        return this.menuItemsService.findAll({ ...pagination, restaurante_id: restauranteId, categoria, etiqueta, disponible: disponibleBool });
     }
 
     @Get(':id')

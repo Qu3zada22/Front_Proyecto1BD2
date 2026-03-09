@@ -17,10 +17,13 @@ export class MenuItemsService {
         restaurante_id?: string;
         categoria?: string;
         etiqueta?: string;
+        disponible?: boolean;
         skip?: number;
         limit?: number;
     }): Promise<MenuItemDocument[]> {
         const filter: any = {};
+        // Por defecto mostrar solo platillos disponibles; pasar disponible=false para ver todos
+        filter.disponible = query.disponible !== undefined ? query.disponible : true;
         if (query.restaurante_id) filter.restaurante_id = new Types.ObjectId(query.restaurante_id);
         if (query.categoria) filter.categoria = query.categoria;
         if (query.etiqueta) filter.etiquetas = query.etiqueta;

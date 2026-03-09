@@ -79,6 +79,26 @@ describe('MenuItemsService', () => {
   // ── findAll ─────────────────────────────────────────────────────────────────
 
   describe('findAll', () => {
+    it('should filter by disponible:true by default when not specified', async () => {
+      const query = createMockQuery([]);
+      mockModel.find.mockReturnValue(query);
+
+      await service.findAll({});
+
+      const callArg = mockModel.find.mock.calls[0][0];
+      expect(callArg.disponible).toBe(true);
+    });
+
+    it('should allow overriding disponible to false', async () => {
+      const query = createMockQuery([]);
+      mockModel.find.mockReturnValue(query);
+
+      await service.findAll({ disponible: false });
+
+      const callArg = mockModel.find.mock.calls[0][0];
+      expect(callArg.disponible).toBe(false);
+    });
+
     it('should return items with default sort/skip/limit when no filters given', async () => {
       const items = [{ nombre: 'Item1' }];
       const query = createMockQuery(items);
@@ -86,7 +106,7 @@ describe('MenuItemsService', () => {
 
       const result = await service.findAll({});
 
-      expect(mockModel.find).toHaveBeenCalledWith({});
+      expect(mockModel.find).toHaveBeenCalledWith(expect.objectContaining({ disponible: true }));
       expect(query.sort).toHaveBeenCalledWith({ categoria: 1, nombre: 1 });
       expect(query.skip).toHaveBeenCalledWith(0);
       expect(query.limit).toHaveBeenCalledWith(50);

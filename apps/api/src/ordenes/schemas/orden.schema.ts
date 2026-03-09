@@ -106,6 +106,8 @@ OrdenSchema.index(
 );
 // Simple: filtro admin global por estado
 OrdenSchema.index({ estado: 1 }, { name: 'estado_simple' });
+// Compuesto: aggregation ingresosPorDia (estado + rango de fechas sin filtro de usuario/restaurante)
+OrdenSchema.index({ estado: 1, fecha_creacion: -1 }, { name: 'idx_ordenes_estado_fecha' });
 // Multikey: aggregation platillos más vendidos ($unwind items)
 OrdenSchema.index({ 'items.item_id': 1 }, { name: 'items_item_id_multikey' });
 // Simple desc: ordenar por fecha de creación

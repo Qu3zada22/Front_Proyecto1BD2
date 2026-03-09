@@ -499,4 +499,91 @@ describe('ReportesService', () => {
       expect(result).toEqual(expected);
     });
   });
+
+  // ── usuariosConMayorGasto ─────────────────────────────────────────────────────
+
+  describe('usuariosConMayorGasto', () => {
+    it('should match only entregado orders', async () => {
+      mockOrdenModel.aggregate.mockResolvedValue([]);
+
+      await service.usuariosConMayorGasto();
+
+      const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
+      expect(pipeline[0]).toEqual({ $match: { estado: 'entregado' } });
+    });
+
+    it('should group by usuario_id summing total_gastado using $toDouble', async () => {
+      mockOrdenModel.aggregate.mockResolvedValue([]);
+
+      await service.usuariosConMayorGasto();
+
+      const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
+      const groupStage = pipeline.find((s: any) => s.$group !== undefined);
+
+      expect(groupStage).toBeDefined();
+      expect(groupStage.$group._id).toBe('$usuario_id');
+      expect(groupStage.$group.total_gastado).toEqual({
+        $sum: { $toDouble: '$total' },
+      });
+      expect(groupStage.$group.total_ordenes).toEqual({ $sum: 1 });
+    });
+
+    it('should sort by total_gastado descending', async () => {
+      mockOrdenModel.aggregate.mockResolvedValue([]);
+
+      await service.usuariosConMayorGasto();
+
+      const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
+      const sortStage = pipeline.find((s: any) => s.$sort !== undefined);
+
+      expect(sortStage).toEqual({ $sort: { total_gastado: -1 } });
+    });
+
+    it('should apply the limit argument', async () => {
+      mockOrdenModel.aggregate.mockResolvedValue([]);
+
+      await service.usuariosConMayorGasto(5);
+
+      const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
+      const limitStage = pipeline.find((s: any) => s.$limit !== undefined);
+
+      expect(limitStage).toEqual({ $limit: 5 });
+    });
+
+    it('should use default limit of 10 when called without argument', async () => {
+      mockOrdenModel.aggregate.mockResolvedValue([]);
+
+      await service.usuariosConMayorGasto();
+
+      const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
+      const limitStage = pipeline.find((s: any) => s.$limit !== undefined);
+
+      expect(limitStage).toEqual({ $limit: 10 });
+    });
+
+    it('should include $lookup to usuarios collection joining on _id', async () => {
+      mockOrdenModel.aggregate.mockResolvedValue([]);
+
+      await service.usuariosConMayorGasto();
+
+      const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
+      const lookupStage = pipeline.find((s: any) => s.$lookup !== undefined);
+
+      expect(lookupStage).toBeDefined();
+      expect(lookupStage.$lookup.from).toBe('usuarios');
+      expect(lookupStage.$lookup.localField).toBe('_id');
+      expect(lookupStage.$lookup.foreignField).toBe('_id');
+    });
+
+    it('should return aggregation results', async () => {
+      const expected = [
+        { usuario: { nombre: 'Ana', email: 'ana@example.com' }, total_gastado: 5000, total_ordenes: 42 },
+      ];
+      mockOrdenModel.aggregate.mockResolvedValue(expected);
+
+      const result = await service.usuariosConMayorGasto(1);
+
+      expect(result).toEqual(expected);
+    });
+  });
 });

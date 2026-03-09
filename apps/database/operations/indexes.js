@@ -85,6 +85,8 @@ async function createOrderIndexes(db) {
     ),
     // Simple sobre estado
     col.createIndex({ estado: 1 }, { name: 'estado_simple' }),
+    // Compuesto: ingresosPorDia (estado + rango fechas, sin usuario_id ni restaurante_id)
+    col.createIndex({ estado: 1, fecha_creacion: -1 }, { name: 'idx_ordenes_estado_fecha' }),
     // Multikey sobre items.item_id
     col.createIndex({ 'items.item_id': 1 }, { name: 'items_item_id_multikey' }),
     // Simple descendente sobre fecha_creacion
