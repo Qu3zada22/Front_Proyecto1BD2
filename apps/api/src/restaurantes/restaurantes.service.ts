@@ -107,7 +107,8 @@ export class RestaurantesService {
             await this.ordenModel.updateMany(
                 {
                     restaurante_id: restaurante._id,
-                    estado: { $in: ['pendiente', 'en_proceso', 'en_camino'] },
+                    // Solo pendiente/en_proceso — en_camino ya está en tránsito (diseño)
+                    estado: { $in: ['pendiente', 'en_proceso'] },
                 },
                 { $set: { estado: 'cancelado' }, $push: { historial_estados: histEntry } },
                 { session },

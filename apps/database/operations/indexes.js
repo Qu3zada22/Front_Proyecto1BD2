@@ -25,6 +25,8 @@ async function createUserIndexes(db) {
     col.createIndex({ rol: 1, activo: 1 }, { name: 'idx_usuarios_rol_activo' }),
     // Multikey sobre preferencias alimentarias ['vegano','sin_gluten',...]
     col.createIndex({ preferencias: 1 }, { name: 'idx_usuarios_preferencias' }),
+    // Simple desc sobre fecha_registro: findAll ordenado por registro (evita COLLSCAN)
+    col.createIndex({ fecha_registro: -1 }, { name: 'idx_usuarios_fecha_registro' }),
   ])
   console.log('  [OK] usuarios indexes')
 }
@@ -66,6 +68,8 @@ async function createMenuItemIndexes(db) {
     col.createIndex({ restaurante_id: 1, disponible: 1 }, { name: 'idx_menuitems_restaurante_disponible' }),
     // Compuesto: items de un restaurante por categoría
     col.createIndex({ restaurante_id: 1, categoria: 1 }, { name: 'idx_menuitems_restaurante_categoria' }),
+    // Simple: filtro global por disponible sin restaurante_id (evita COLLSCAN con notablescan)
+    col.createIndex({ disponible: 1 }, { name: 'idx_menuitems_disponible' }),
   ])
   console.log('  [OK] menu_items indexes')
 }

@@ -60,3 +60,5 @@ UsuarioSchema.index({ rol: 1 }, { name: 'rol_simple' });
 UsuarioSchema.index({ rol: 1, activo: 1 }, { name: 'idx_usuarios_rol_activo' });
 // Multikey: filtrar/sugerir por preferencias alimentarias ['vegano','sin_gluten',...]
 UsuarioSchema.index({ preferencias: 1 }, { name: 'idx_usuarios_preferencias' });
+// Simple desc: findAll ordenado por fecha de registro (evita COLLSCAN con notablescan)
+UsuarioSchema.index({ fecha_registro: -1 }, { name: 'idx_usuarios_fecha_registro' });

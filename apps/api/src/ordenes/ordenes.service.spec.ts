@@ -320,7 +320,7 @@ describe('OrdenesService', () => {
   // ── updateStatus ─────────────────────────────────────────────────────────────
 
   describe('updateStatus', () => {
-    it('should update with $set estado AND $push to historial_estados', async () => {
+    it('should update with $set estado AND $push to historial_estados with $slice:-5', async () => {
       const updated = { _id: 'o1', estado: 'en_proceso' };
       const query = createMockQuery(updated);
       mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
@@ -330,8 +330,10 @@ describe('OrdenesService', () => {
       const [id, update, opts] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
       expect(id).toBe('o1');
       expect(update.$set.estado).toBe('en_proceso');
-      expect(update.$push.historial_estados).toMatchObject({ estado: 'en_proceso' });
-      expect(update.$push.historial_estados.timestamp).toBeInstanceOf(Date);
+      // $each + $slice:-5 para mantener array acotado en máximo 5 entradas (diseño)
+      expect(update.$push.historial_estados.$each[0]).toMatchObject({ estado: 'en_proceso' });
+      expect(update.$push.historial_estados.$each[0].timestamp).toBeInstanceOf(Date);
+      expect(update.$push.historial_estados.$slice).toBe(-5);
       expect(opts).toEqual({ new: true });
       expect(result).toEqual(updated);
     });
@@ -364,8 +366,8 @@ describe('OrdenesService', () => {
       await service.updateStatus('o1', 'en_proceso', actorId);
 
       const [, update] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
-      expect(update.$push.historial_estados.actor_id).toBeInstanceOf(Types.ObjectId);
-      expect(update.$push.historial_estados.actor_id.toString()).toBe(actorId);
+      expect(update.$push.historial_estados.$each[0].actor_id).toBeInstanceOf(Types.ObjectId);
+      expect(update.$push.historial_estados.$each[0].actor_id.toString()).toBe(actorId);
     });
 
     it('should include nota in historial entry when provided', async () => {
@@ -375,7 +377,7 @@ describe('OrdenesService', () => {
       await service.updateStatus('o1', 'cancelado', undefined, 'Cliente canceló');
 
       const [, update] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
-      expect(update.$push.historial_estados.nota).toBe('Cliente canceló');
+      expect(update.$push.historial_estados.$each[0].nota).toBe('Cliente canceló');
     });
 
     it('should accept all valid estado values including en_proceso', async () => {

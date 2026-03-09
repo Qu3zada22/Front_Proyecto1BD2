@@ -64,3 +64,5 @@ MenuItemSchema.index(
     { restaurante_id: 1, categoria: 1 },
     { name: 'idx_menuitems_restaurante_categoria' },
 );
+// Simple: findAll filtrando solo por disponible sin restaurante_id (evita COLLSCAN con notablescan)
+MenuItemSchema.index({ disponible: 1 }, { name: 'idx_menuitems_disponible' });

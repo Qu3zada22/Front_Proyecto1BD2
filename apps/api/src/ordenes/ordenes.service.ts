@@ -125,7 +125,8 @@ export class OrdenesService {
 
         const update: any = {
             $set: { estado },
-            $push: { historial_estados: histEntry },
+            // $each + $slice:-5 mantiene el array acotado en máximo 5 transiciones (diseño)
+            $push: { historial_estados: { $each: [histEntry], $slice: -5 } },
         };
 
         if (estado === 'entregado') {

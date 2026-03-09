@@ -131,64 +131,105 @@ describe('ReportesService', () => {
   });
 
   // ── topRestaurantes ──────────────────────────────────────────────────────────
+  // Pipeline parte de resenas (fuente de verdad), no del campo desnormalizado
 
   describe('topRestaurantes', () => {
-    it('should use $lookup on resenas collection and return top restaurants', async () => {
-      const expected = [
-        { nombre: 'Pizza Palace', avg_calificacion: 4.9, cantidad_resenas: 120 },
-      ];
-      mockRestauranteModel.aggregate.mockResolvedValue(expected);
+    it('should start pipeline from resenas collection (not restaurantes)', async () => {
+      const expected = [{ nombre: 'Pizza Palace', avg_calificacion: 4.9, cantidad_resenas: 120 }];
+      mockResenaModel.aggregate.mockResolvedValue(expected);
 
       const result = await service.topRestaurantes(5);
 
-      expect(mockRestauranteModel.aggregate).toHaveBeenCalledTimes(1);
-      const pipeline = mockRestauranteModel.aggregate.mock.calls[0][0];
-
-      // Stage 0: $match activo: true
-      expect(pipeline[0]).toEqual({ $match: { activo: true } });
-
-      // Stage 1: $lookup on resenas
-      expect(pipeline[1]).toMatchObject({
-        $lookup: {
-          from: 'resenas',
-          localField: '_id',
-          foreignField: 'restaurante_id',
-          as: 'resenas',
-        },
-      });
-
-      // Stage 2: $addFields with avg_calificacion and cantidad_resenas
-      expect(pipeline[2]).toMatchObject({
-        $addFields: {
-          avg_calificacion: { $avg: '$resenas.calificacion' },
-          cantidad_resenas: { $size: '$resenas' },
-        },
-      });
-
-      // Stage 3: $match minimum 5 reviews (per design doc)
-      expect(pipeline[3]).toEqual({
-        $match: { cantidad_resenas: { $gte: 5 } },
-      });
-
-      // Stage 4: $sort by avg_calificacion desc
-      expect(pipeline[4]).toEqual({
-        $sort: { avg_calificacion: -1, cantidad_resenas: -1 },
-      });
-
-      // Stage 5: $limit applied with the argument
-      expect(pipeline[5]).toEqual({ $limit: 5 });
-
+      // Must aggregate on resenaModel, NOT on restauranteModel
+      expect(mockResenaModel.aggregate).toHaveBeenCalledTimes(1);
+      expect(mockRestauranteModel.aggregate).not.toHaveBeenCalled();
       expect(result).toEqual(expected);
     });
 
-    it('should use default limit of 10 when called without argument', async () => {
-      mockRestauranteModel.aggregate.mockResolvedValue([]);
+    it('should $match activa:true and restaurante_id exists as first stage', async () => {
+      mockResenaModel.aggregate.mockResolvedValue([]);
 
       await service.topRestaurantes();
 
-      const pipeline = mockRestauranteModel.aggregate.mock.calls[0][0];
+      const pipeline = mockResenaModel.aggregate.mock.calls[0][0];
+      expect(pipeline[0]).toEqual({
+        $match: { activa: true, restaurante_id: { $exists: true } },
+      });
+    });
+
+    it('should $group by restaurante_id calculating avg_calificacion and count', async () => {
+      mockResenaModel.aggregate.mockResolvedValue([]);
+
+      await service.topRestaurantes();
+
+      const pipeline = mockResenaModel.aggregate.mock.calls[0][0];
+      const groupStage = pipeline.find((s: any) => s.$group !== undefined);
+
+      expect(groupStage).toBeDefined();
+      expect(groupStage.$group._id).toBe('$restaurante_id');
+      expect(groupStage.$group.avg_calificacion).toEqual({ $avg: '$calificacion' });
+      expect(groupStage.$group.cantidad_resenas).toEqual({ $sum: 1 });
+    });
+
+    it('should have a second $match requiring at least 5 reviews after $group', async () => {
+      mockResenaModel.aggregate.mockResolvedValue([]);
+
+      await service.topRestaurantes();
+
+      const pipeline = mockResenaModel.aggregate.mock.calls[0][0];
+      const groupIdx = pipeline.findIndex((s: any) => s.$group !== undefined);
+      // second $match must come after $group
+      const secondMatch = pipeline.slice(groupIdx + 1).find((s: any) => s.$match !== undefined);
+
+      expect(secondMatch).toEqual({ $match: { cantidad_resenas: { $gte: 5 } } });
+    });
+
+    it('should sort by avg_calificacion desc then cantidad_resenas desc', async () => {
+      mockResenaModel.aggregate.mockResolvedValue([]);
+
+      await service.topRestaurantes();
+
+      const pipeline = mockResenaModel.aggregate.mock.calls[0][0];
+      const sortStage = pipeline.find((s: any) => s.$sort !== undefined);
+
+      expect(sortStage).toEqual({ $sort: { avg_calificacion: -1, cantidad_resenas: -1 } });
+    });
+
+    it('should apply the limit argument', async () => {
+      mockResenaModel.aggregate.mockResolvedValue([]);
+
+      await service.topRestaurantes(5);
+
+      const pipeline = mockResenaModel.aggregate.mock.calls[0][0];
+      const limitStage = pipeline.find((s: any) => s.$limit !== undefined);
+      expect(limitStage).toEqual({ $limit: 5 });
+    });
+
+    it('should use default limit of 10 when called without argument', async () => {
+      mockResenaModel.aggregate.mockResolvedValue([]);
+
+      await service.topRestaurantes();
+
+      const pipeline = mockResenaModel.aggregate.mock.calls[0][0];
       const limitStage = pipeline.find((s: any) => s.$limit !== undefined);
       expect(limitStage).toEqual({ $limit: 10 });
+    });
+
+    it('should $lookup restaurantes collection and $unwind the result', async () => {
+      mockResenaModel.aggregate.mockResolvedValue([]);
+
+      await service.topRestaurantes();
+
+      const pipeline = mockResenaModel.aggregate.mock.calls[0][0];
+      const lookupStage = pipeline.find((s: any) => s.$lookup !== undefined);
+      const unwindStage = pipeline.find((s: any) => s.$unwind !== undefined);
+
+      expect(lookupStage).toBeDefined();
+      expect(lookupStage.$lookup.from).toBe('restaurantes');
+      expect(lookupStage.$lookup.localField).toBe('_id');
+      expect(lookupStage.$lookup.foreignField).toBe('_id');
+      expect(unwindStage).toBeDefined();
+      expect(unwindStage.$unwind).toBe('$restaurante');
     });
   });
 
@@ -406,7 +447,7 @@ describe('ReportesService', () => {
       });
     });
 
-    it('should sum total_ingresos using $toDouble on total (Decimal128 compat)', async () => {
+    it('should sum total_ingresos using $toDecimal on total (preserva precisión Decimal128)', async () => {
       mockOrdenModel.aggregate.mockResolvedValue([]);
 
       await service.ingresosPorRestaurantePorMes();
@@ -415,7 +456,7 @@ describe('ReportesService', () => {
       const groupStage = pipeline.find((s: any) => s.$group !== undefined);
 
       expect(groupStage.$group.total_ingresos).toEqual({
-        $sum: { $toDouble: '$total' },
+        $sum: { $toDecimal: '$total' },
       });
     });
 
@@ -512,7 +553,7 @@ describe('ReportesService', () => {
       expect(pipeline[0]).toEqual({ $match: { estado: 'entregado' } });
     });
 
-    it('should group by usuario_id summing total_gastado using $toDouble', async () => {
+    it('should group by usuario_id summing total_gastado using $toDecimal (preserva precisión Decimal128)', async () => {
       mockOrdenModel.aggregate.mockResolvedValue([]);
 
       await service.usuariosConMayorGasto();
@@ -523,7 +564,7 @@ describe('ReportesService', () => {
       expect(groupStage).toBeDefined();
       expect(groupStage.$group._id).toBe('$usuario_id');
       expect(groupStage.$group.total_gastado).toEqual({
-        $sum: { $toDouble: '$total' },
+        $sum: { $toDecimal: '$total' },
       });
       expect(groupStage.$group.total_ordenes).toEqual({ $sum: 1 });
     });
