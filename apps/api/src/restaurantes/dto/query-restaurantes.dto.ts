@@ -7,7 +7,7 @@ export class QueryRestaurantesDto extends PaginationDto {
     @IsOptional() @IsString() busqueda?: string;
 
     @IsOptional()
-    @Transform(({ value }) => value === 'true')
+    @Transform(({ value }) => value === 'true' || value === true)
     @IsBoolean()
     activo?: boolean;
 }

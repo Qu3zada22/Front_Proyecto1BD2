@@ -81,11 +81,11 @@ export class ReportesService {
             { $unwind: '$items' },
             {
                 $group: {
-                    _id: '$items.menu_item_id',
+                    _id: '$items.item_id',
                     nombre: { $first: '$items.nombre' },
                     total_vendidos: { $sum: '$items.cantidad' },
                     ingresos: {
-                        $sum: { $multiply: ['$items.precio', '$items.cantidad'] },
+                        $sum: { $toDouble: '$items.subtotal' },
                     },
                 },
             },
@@ -110,15 +110,15 @@ export class ReportesService {
             {
                 $match: {
                     estado: 'entregado',
-                    createdAt: { $gte: startDate, $lte: endDate },
+                    fecha_creacion: { $gte: startDate, $lte: endDate },
                 },
             },
             {
                 $group: {
-                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-                    total_ingresos: { $sum: '$total' },
+                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$fecha_creacion' } },
+                    total_ingresos: { $sum: { $toDouble: '$total' } },
                     total_ordenes: { $sum: 1 },
-                    ticket_promedio: { $avg: '$total' },
+                    ticket_promedio: { $avg: { $toDouble: '$total' } },
                 },
             },
             { $sort: { _id: 1 } },

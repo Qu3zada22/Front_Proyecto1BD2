@@ -13,7 +13,7 @@ export class FilesService implements OnModuleInit {
 
     onModuleInit() {
         this.bucket = new GridFSBucket(this.connection.db as any, {
-            bucketName: 'uploads',
+            bucketName: 'media',
         });
     }
 

@@ -51,12 +51,11 @@ export class ReportesController {
 
     @Get('revenue/by-day')
     @ApiOperation({ summary: 'Ingresos por día', description: 'Aggregation: $match por rango de fechas + $group con $dateToString + suma de totales.' })
-    @ApiQuery({ name: 'desde', required: false, example: '2026-01-01', description: 'Fecha inicio ISO (default: inicio del mes)' })
-    @ApiQuery({ name: 'hasta', required: false, example: '2026-03-08', description: 'Fecha fin ISO (default: hoy)' })
+    @ApiQuery({ name: 'desde', required: false, example: '2024-01-01', description: 'Fecha inicio ISO (default: 2024-01-01, datos entre 2023-2025)' })
+    @ApiQuery({ name: 'hasta', required: false, example: '2025-12-31', description: 'Fecha fin ISO (default: 2025-12-31)' })
     ingresosPorDia(@Query('desde') desde: string, @Query('hasta') hasta: string) {
-        const now = new Date();
-        const start = desde ?? new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-        const end = hasta ?? now.toISOString();
+        const start = desde ?? '2024-01-01';
+        const end = hasta ?? '2025-12-31';
         return this.reportesService.ingresosPorDia(start, end);
     }
 

@@ -51,11 +51,11 @@ export class MenuItemsService {
     async updateMany(
         restauranteId: string,
         dto: UpdateMenuItemDto,
-    ): Promise<{ modified: number }> {
+    ): Promise<{ modifiedCount: number }> {
         const result = await this.menuItemModel
-            .updateMany({ restaurante_id: restauranteId }, { $set: dto })
+            .updateMany({ restaurante_id: new Types.ObjectId(restauranteId) }, { $set: dto })
             .exec();
-        return { modified: result.modifiedCount };
+        return { modifiedCount: result.modifiedCount };
     }
 
     async remove(id: string): Promise<{ deleted: boolean }> {
