@@ -6,23 +6,14 @@
 
 const BASE = '/api'
 
-async function req<T>(path: string, init?: RequestInit, retries = 3): Promise<T> {
-  try {
-    const res = await fetch(`${BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
-      ...init,
-    })
-    const json = await res.json()
-    if (!json.success) throw new Error(json.message || `API error ${res.status}`)
-    return json.data as T
-  } catch (err: any) {
-    // Reintentar si la API aún no levantó (arranque en paralelo con Vite)
-    if (retries > 0 && (err?.message?.includes('Failed to fetch') || err?.message?.includes('ECONNREFUSED'))) {
-      await new Promise(r => setTimeout(r, 800))
-      return req<T>(path, init, retries - 1)
-    }
-    throw err
-  }
+async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    ...init,
+  })
+  const json = await res.json()
+  if (!json.success) throw new Error(json.message || `API error ${res.status}`)
+  return json.data as T
 }
 
 // ── Helpers ─────────────────────────────────────────────────
