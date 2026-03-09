@@ -45,7 +45,8 @@ export class FilesService implements OnModuleInit {
         if (!files.length) throw new NotFoundException('Archivo no encontrado');
 
         const file = files[0];
-        res.setHeader('Content-Type', (file.metadata?.contentType as string) ?? 'application/octet-stream');
+        const contentType = (file.metadata?.contentType as string) || this.mimeFromFilename(file.filename);
+        res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `inline; filename="${file.filename}"`);
 
         this.bucket.openDownloadStream(objectId).pipe(res);
@@ -62,5 +63,15 @@ export class FilesService implements OnModuleInit {
 
     async listFiles(): Promise<any[]> {
         return this.bucket.find({}).sort({ uploadDate: -1 }).limit(50).toArray();
+    }
+
+    private mimeFromFilename(filename: string): string {
+        const ext = filename?.split('.').pop()?.toLowerCase();
+        const map: Record<string, string> = {
+            png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+            gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+            pdf: 'application/pdf',
+        };
+        return map[ext ?? ''] ?? 'application/octet-stream';
     }
 }
