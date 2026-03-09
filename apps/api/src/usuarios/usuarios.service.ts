@@ -52,6 +52,16 @@ export class UsuariosService {
         return { deleted: true };
     }
 
+    async findByEmail(email: string): Promise<UsuarioDocument> {
+        const usuario = await this.usuarioModel
+            .findOne({ email })
+            .select('-password')
+            .lean()
+            .exec();
+        if (!usuario) throw new NotFoundException('Usuario no encontrado');
+        return usuario as UsuarioDocument;
+    }
+
     // $push — agregar dirección al array embedded
     async addAddress(id: string, address: any): Promise<UsuarioDocument> {
         const updated = await this.usuarioModel

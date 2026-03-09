@@ -10,7 +10,7 @@ type DemoUser = { label: string; email: string; rol: string }
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, user } = useAuth()
   const [email, setEmail] = useState("")
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -64,7 +64,7 @@ export default function LoginPage() {
         <Card className="border-0 shadow-lg">
           <CardHeader className="pb-2 text-center">
             <h1 className="text-xl font-semibold text-foreground">Iniciar Sesion</h1>
-            <p className="text-sm text-muted-foreground">Selecciona un usuario de demo</p>
+            <p className="text-sm text-muted-foreground">Ingresa tu correo para continuar</p>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {demoUsers.map((u) => (
@@ -91,9 +91,10 @@ export default function LoginPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(false) }}
+                onChange={(e) => { setEmail(e.target.value); setError(null) }}
                 placeholder="correo@ejemplo.com"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                disabled={loading}
               />
               {error && <p className="text-xs text-destructive">Usuario no encontrado</p>}
               <Button type="submit" className="w-full" disabled={loading}>
