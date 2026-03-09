@@ -29,6 +29,9 @@ export class MenuItem {
     @Prop() imagen?: string;
 
     @Prop({ default: true }) disponible: boolean;
+
+    @Prop({ default: 0 }) veces_ordenado: number;
+    @Prop({ default: 0 }) orden_display: number;
 }
 
 export const MenuItemSchema = SchemaFactory.createForClass(MenuItem);

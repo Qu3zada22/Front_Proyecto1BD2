@@ -72,7 +72,11 @@ function normalizeOrden(o: any): any {
     tiene_resena: o.tiene_resena ?? false,
     fecha_creacion: o.fecha_creacion ?? o.createdAt ?? '',
     total: toNum(o.total),
-    items: (o.items ?? []).map((i: any) => ({ ...i, precio: toNum(i.precio) })),
+    items: (o.items ?? []).map((i: any) => {
+      const precio = toNum(i.precio_unitario ?? i.precio)
+      const subtotal = toNum(i.subtotal) || precio * (i.cantidad ?? 1)
+      return { ...i, precio_unitario: precio, precio, subtotal }
+    }),
   }
 }
 
