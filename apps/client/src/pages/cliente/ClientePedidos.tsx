@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { ClipboardList, ChevronRight, MessageSquare, XCircle, Star } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -15,7 +15,11 @@ import { REVIEW_TAGS } from "@/lib/mock-data"
 
 export default function ClientePedidos() {
   const { user } = useAuth()
-  const { ordenes, restaurantes, cancelOrder, addResena } = useData()
+  const { ordenes, restaurantes, cancelOrder, addResena, loadOrdenes } = useData()
+
+  useEffect(() => {
+    if (user?._id) loadOrdenes({ cliente_id: user._id })
+  }, [user?._id, loadOrdenes])
 
   // Cancel state
   const [cancelId, setCancelId] = useState<string | null>(null)

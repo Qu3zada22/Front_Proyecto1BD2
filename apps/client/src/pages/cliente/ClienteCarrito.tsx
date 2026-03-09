@@ -23,10 +23,10 @@ export default function ClienteCarrito() {
 
   const restaurante = restaurantes.find((r) => r._id === restauranteId)
 
-  const handleConfirmOrder = () => {
+  const handleConfirmOrder = async () => {
     if (!user || items.length === 0) return
     const dir = user.direcciones.find((d) => d.alias === selectedDireccion) || user.direcciones[0]
-    const orderId = createOrder({
+    const orderId = await createOrder({
       usuario_id: user._id,
       restaurante_id: restauranteId!,
       items: items.map((i) => ({

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { MenuItem, MenuItemDocument } from './schemas/menu-item.schema';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
@@ -21,7 +21,7 @@ export class MenuItemsService {
         limit?: number;
     }): Promise<MenuItemDocument[]> {
         const filter: any = {};
-        if (query.restaurante_id) filter.restaurante_id = query.restaurante_id;
+        if (query.restaurante_id) filter.restaurante_id = new Types.ObjectId(query.restaurante_id);
         if (query.categoria) filter.categoria = query.categoria;
         if (query.etiqueta) filter.etiquetas = query.etiqueta;
 

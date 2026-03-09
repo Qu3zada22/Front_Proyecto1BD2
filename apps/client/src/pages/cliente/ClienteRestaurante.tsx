@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useParams, Link } from "react-router-dom"
 import { ArrowLeft, Plus, Minus, ShoppingCart, Clock, MapPin, ThumbsUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StarRating } from "@/components/fastpochi/star-rating"
 import { useData, useCart, useAuth } from "@/lib/store"
-import { usuarios } from "@/lib/mock-data"
 import type { MenuItem } from "@/lib/mock-data"
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -20,10 +19,14 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export default function ClienteRestaurante() {
   const { id } = useParams<{ id: string }>()
-  const { restaurantes, menuItems, resenas, toggleLikeResena } = useData()
+  const { restaurantes, menuItems, resenas, loadMenuItems, toggleLikeResena } = useData()
   const { addItem, itemCount } = useCart()
   const { user } = useAuth()
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    if (id) loadMenuItems(id)
+  }, [id, loadMenuItems])
 
   const restaurant = restaurantes.find((r) => r._id === id)
   const items = menuItems.filter((mi) => mi.restaurante_id === id && mi.disponible)
@@ -96,7 +99,7 @@ export default function ClienteRestaurante() {
                 {categories.map((cat) => (
                   <TabsContent key={cat} value={cat}>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      {items.filter((i) => i.categoria === cat).sort((a, b) => a.orden_display - b.orden_display).map((mi) => {
+                      {items.filter((i) => i.categoria === cat).sort((a, b) => (a as any).orden_display - (b as any).orden_display).map((mi) => {
                         const qty = quantities[mi._id] || 0
                         return (
                           <Card key={mi._id} className="overflow-hidden border-0 shadow-sm">
@@ -152,7 +155,7 @@ export default function ClienteRestaurante() {
             ) : (
               <div className="flex flex-col gap-4">
                 {restaurantResenas.map((re) => {
-                  const autor = usuarios.find((u) => u._id === re.usuario_id)
+                  const autor = (re as any).cliente_id
                   const hasLiked = user ? re.likes.includes(user._id) : false
                   return (
                     <Card key={re._id} className="border-0 shadow-sm">
@@ -164,7 +167,7 @@ export default function ClienteRestaurante() {
                               <span className="text-sm font-medium text-foreground">{re.titulo}</span>
                             </div>
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                              {autor?.nombre || "Usuario"} · {new Date(re.fecha).toLocaleDateString("es-GT", { year: "numeric", month: "short", day: "numeric" })}
+                              {(autor as any)?.nombre || "Usuario"} · {new Date(re.fecha || (re as any).createdAt).toLocaleDateString("es-GT", { year: "numeric", month: "short", day: "numeric" })}
                             </p>
                             {re.comentario && (
                               <p className="mt-2 text-sm text-foreground">{re.comentario}</p>

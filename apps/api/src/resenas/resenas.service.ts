@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Resena, ResenaDocument } from './schemas/resena.schema';
 
 @Injectable()
@@ -20,7 +20,7 @@ export class ResenasService {
         const sortField: Record<string, 1 | -1> =
             sort === 'fecha' ? { createdAt: -1 } : { calificacion: -1 };
         return this.resenaModel
-            .find({ restaurante_id: restauranteId })
+            .find({ restaurante_id: new Types.ObjectId(restauranteId) })
             .populate('cliente_id', 'nombre')
             .sort(sortField)
             .skip(skip)

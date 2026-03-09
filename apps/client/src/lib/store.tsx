@@ -1,17 +1,13 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react" // React removed (unused)
-import {
-  usuarios as usuariosData,
-  restaurantes as restaurantesData,
-  menuItems as menuItemsData,
-  ordenesIniciales,
-  resenasIniciales,
-  type Usuario,
-  type Restaurante,
-  type MenuItem,
-  type Orden,
-  type Resena,
-  type EstadoOrden,
-  type ItemOrden,
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
+import { api } from "./api"
+import type {
+  Usuario,
+  Restaurante,
+  MenuItem,
+  Orden,
+  Resena,
+  EstadoOrden,
+  ItemOrden,
 } from "./mock-data"
 import { loginByEmail, type UsuarioAPI } from "@/services/usuarios"
 
@@ -20,25 +16,24 @@ import { loginByEmail, type UsuarioAPI } from "@/services/usuarios"
 // ============================================================
 
 interface AuthContextType {
-  user: Usuario | UsuarioAPI | null
-  login: (email: string) => Promise<{ ok: boolean; error?: string }>
+  user: Usuario | null
+  login: (email: string, password: string) => Promise<boolean>
   logout: () => void
-  register: (data: Partial<Usuario>) => boolean
+  register: (data: Partial<Usuario>) => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<Usuario | UsuarioAPI | null>(null)
-  const [allUsers, setAllUsers] = useState<Usuario[]>(usuariosData)
+  const [user, setUser] = useState<Usuario | null>(null)
 
-  const login = useCallback(async (email: string): Promise<{ ok: boolean; error?: string }> => {
+  const login = useCallback(async (email: string, _password: string) => {
     try {
-      const apiUser = await loginByEmail(email)
-      setUser(apiUser)
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : "Error al iniciar sesión" }
+      const userData = await api.login(email)
+      setUser(userData as Usuario)
+      return true
+    } catch {
+      return false
     }
   }, [])
 
@@ -46,22 +41,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
-  const register = useCallback((data: Partial<Usuario>) => {
-    const newUser: Usuario = {
-      _id: `u${Date.now()}`,
-      nombre: data.nombre || "",
-      email: data.email || "",
-      password: "$2b$10$registered",
-      telefono: data.telefono,
-      rol: data.rol || "cliente",
-      activo: true,
-      fecha_registro: new Date().toISOString(),
-      preferencias: data.preferencias || [],
-      direcciones: data.direcciones || [],
+  const register = useCallback(async (data: Partial<Usuario>) => {
+    try {
+      const userData = await api.register(data)
+      setUser(userData as Usuario)
+      return true
+    } catch {
+      return false
     }
-    setAllUsers((prev) => [...prev, newUser])
-    setUser(newUser)
-    return true
   }, [])
 
   return (
@@ -96,37 +83,36 @@ interface DataContextType {
   ordenes: Orden[]
   resenas: Resena[]
   notifications: Notification[]
-  // Admin user management
+  loading: boolean
   adminUsers: Usuario[]
+  // Lazy loaders
+  loadMenuItems: (restauranteId: string) => Promise<void>
+  loadOrdenes: (params?: { cliente_id?: string; restaurante_id?: string }) => Promise<void>
+  // Admin user management
   toggleUserActivo: (id: string) => void
   deleteUser: (id: string) => void
   deleteUsers: (ids: string[]) => void
-
   // Restaurant CRUD
-  addRestaurante: (r: Omit<Restaurante, "_id" | "fecha_creacion" | "calificacion_prom" | "total_resenas" | "activo">) => void
-  updateRestaurante: (id: string, data: Partial<Restaurante>) => void
-  deleteRestaurante: (id: string) => void
+  addRestaurante: (r: Omit<Restaurante, "_id" | "fecha_creacion" | "calificacion_prom" | "total_resenas" | "activo">) => Promise<void>
+  updateRestaurante: (id: string, data: Partial<Restaurante>) => Promise<void>
+  deleteRestaurante: (id: string) => Promise<void>
   toggleRestauranteActivo: (id: string) => void
-
   // Menu CRUD
-  addMenuItem: (item: Omit<MenuItem, "_id" | "fecha_creacion" | "veces_ordenado">) => void
-  updateMenuItem: (id: string, data: Partial<MenuItem>) => void
-  deleteMenuItem: (id: string) => void
+  addMenuItem: (item: Omit<MenuItem, "_id" | "fecha_creacion" | "veces_ordenado">) => Promise<void>
+  updateMenuItem: (id: string, data: Partial<MenuItem>) => Promise<void>
+  deleteMenuItem: (id: string) => Promise<void>
   deleteMenuItems: (ids: string[]) => void
   toggleMenuItemDisponible: (id: string) => void
   setMenuItemsDisponible: (ids: string[], disponible: boolean) => void
-
   // Orders
-  createOrder: (order: Omit<Orden, "_id" | "fecha_creacion" | "historial_estados" | "tiene_resena" | "estado">) => string
-  advanceOrderStatus: (orderId: string, actorId: string) => void
-  cancelOrder: (orderId: string, actorId: string, nota?: string) => void
-
+  createOrder: (order: Omit<Orden, "_id" | "fecha_creacion" | "historial_estados" | "tiene_resena" | "estado">) => Promise<string>
+  advanceOrderStatus: (orderId: string, actorId: string) => Promise<void>
+  cancelOrder: (orderId: string, actorId: string, nota?: string) => Promise<void>
   // Reviews
-  addResena: (resena: Omit<Resena, "_id" | "fecha" | "activa" | "likes">) => void
+  addResena: (resena: Omit<Resena, "_id" | "fecha" | "activa" | "likes">) => Promise<void>
   toggleResenaActiva: (id: string) => void
   toggleLikeResena: (resenaId: string, userId: string) => void
   deleteResenas: (ids: string[]) => void
-
   // Notifications
   markNotificationRead: (id: string) => void
   markAllNotificationsRead: () => void
@@ -137,203 +123,183 @@ const DataContext = createContext<DataContextType | undefined>(undefined)
 const STATUS_FLOW: EstadoOrden[] = ["pendiente", "en_proceso", "en_camino", "entregado"]
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [restaurantes, setRestaurantes] = useState<Restaurante[]>(restaurantesData)
-  const [menuItemsList, setMenuItems] = useState<MenuItem[]>(menuItemsData)
-  const [ordenes, setOrdenes] = useState<Orden[]>(ordenesIniciales)
-  const [resenas, setResenas] = useState<Resena[]>(resenasIniciales)
+  const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
+  const [menuItemsList, setMenuItems] = useState<MenuItem[]>([])
+  const [ordenes, setOrdenes] = useState<Orden[]>([])
+  const [resenas, setResenas] = useState<Resena[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [adminUsers, setAdminUsers] = useState<Usuario[]>(usuariosData)
+  const [adminUsers, setAdminUsers] = useState<Usuario[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Load initial data from API
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true)
+      try {
+        const [rests, users] = await Promise.all([
+          api.getRestaurantes(),
+          api.getUsers(),
+        ])
+        setRestaurantes(rests as Restaurante[])
+        setAdminUsers(users as Usuario[])
+      } catch (err) {
+        console.error("Error cargando datos iniciales:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    init()
+  }, [])
+
+  // Lazy load menu items per restaurant
+  const loadMenuItems = useCallback(async (restauranteId: string) => {
+    try {
+      const items = await api.getMenuItems(restauranteId)
+      setMenuItems((prev) => {
+        const others = prev.filter((i) => i.restaurante_id !== restauranteId)
+        return [...others, ...(items as MenuItem[])]
+      })
+    } catch (err) {
+      console.error("Error cargando menu items:", err)
+    }
+  }, [])
+
+  // Lazy load orders with optional filter
+  const loadOrdenes = useCallback(async (params?: { cliente_id?: string; restaurante_id?: string }) => {
+    try {
+      const orders = await api.getOrders({ ...params, limit: "50" })
+      setOrdenes(orders as Orden[])
+    } catch (err) {
+      console.error("Error cargando ordenes:", err)
+    }
+  }, [])
 
   // --- Restaurants ---
-  const addRestaurante = useCallback((r: Omit<Restaurante, "_id" | "fecha_creacion" | "calificacion_prom" | "total_resenas" | "activo">) => {
-    const newR: Restaurante = {
-      ...r,
-      _id: `r${Date.now()}`,
-      calificacion_prom: 0,
-      total_resenas: 0,
-      activo: true,
-      fecha_creacion: new Date().toISOString(),
-    }
-    setRestaurantes((prev) => [...prev, newR])
+  const addRestaurante = useCallback(async (r: Omit<Restaurante, "_id" | "fecha_creacion" | "calificacion_prom" | "total_resenas" | "activo">) => {
+    const created = await api.createRestaurante(r)
+    setRestaurantes((prev) => [...prev, created as Restaurante])
   }, [])
 
-  const updateRestaurante = useCallback((id: string, data: Partial<Restaurante>) => {
-    setRestaurantes((prev) => prev.map((r) => r._id === id ? { ...r, ...data } : r))
+  const updateRestaurante = useCallback(async (id: string, data: Partial<Restaurante>) => {
+    const updated = await api.updateRestaurante(id, data)
+    setRestaurantes((prev) => prev.map((r) => r._id === id ? updated as Restaurante : r))
   }, [])
 
-  const deleteRestaurante = useCallback((id: string) => {
+  const deleteRestaurante = useCallback(async (id: string) => {
+    await api.deleteRestaurante(id)
     setRestaurantes((prev) => prev.filter((r) => r._id !== id))
     setMenuItems((prev) => prev.filter((mi) => mi.restaurante_id !== id))
   }, [])
 
   const toggleRestauranteActivo = useCallback((id: string) => {
-    setRestaurantes((prev) => prev.map((r) => r._id === id ? { ...r, activo: !r.activo } : r))
-    // If deactivating, also disable menu items and cancel pending orders
-    setRestaurantes((prev) => {
-      const rest = prev.find((r) => r._id === id)
-      if (rest && !rest.activo) {
-        setMenuItems((items) => items.map((i) => i.restaurante_id === id ? { ...i, disponible: false } : i))
-        setOrdenes((orders) => orders.map((o) => {
-          if (o.restaurante_id === id && (o.estado === "pendiente" || o.estado === "en_proceso")) {
-            return {
-              ...o,
-              estado: "cancelado" as EstadoOrden,
-              historial_estados: [...o.historial_estados, { estado: "cancelado", timestamp: new Date().toISOString(), actor_id: "system", nota: "Restaurante desactivado" }]
-            }
-          }
-          return o
-        }))
-      }
-      return prev
-    })
-  }, [])
+    const rest = restaurantes.find((r) => r._id === id)
+    if (!rest) return
+    api.updateRestaurante(id, { activo: !rest.activo }).then((updated) => {
+      setRestaurantes((prev) => prev.map((r) => r._id === id ? updated as Restaurante : r))
+    }).catch(console.error)
+  }, [restaurantes])
 
   // --- Menu Items ---
-  const addMenuItem = useCallback((item: Omit<MenuItem, "_id" | "fecha_creacion" | "veces_ordenado">) => {
-    const newItem: MenuItem = {
-      ...item,
-      _id: `mi${Date.now()}`,
-      veces_ordenado: 0,
-      fecha_creacion: new Date().toISOString(),
-    }
-    setMenuItems((prev) => [...prev, newItem])
+  const addMenuItem = useCallback(async (item: Omit<MenuItem, "_id" | "fecha_creacion" | "veces_ordenado">) => {
+    const created = await api.createMenuItem(item)
+    setMenuItems((prev) => [...prev, created as MenuItem])
   }, [])
 
-  const updateMenuItem = useCallback((id: string, data: Partial<MenuItem>) => {
-    setMenuItems((prev) => prev.map((i) => i._id === id ? { ...i, ...data } : i))
+  const updateMenuItem = useCallback(async (id: string, data: Partial<MenuItem>) => {
+    const updated = await api.updateMenuItem(id, data)
+    setMenuItems((prev) => prev.map((i) => i._id === id ? updated as MenuItem : i))
   }, [])
 
-  const deleteMenuItem = useCallback((id: string) => {
+  const deleteMenuItem = useCallback(async (id: string) => {
+    await api.deleteMenuItem(id)
     setMenuItems((prev) => prev.filter((i) => i._id !== id))
   }, [])
 
   const deleteMenuItems = useCallback((ids: string[]) => {
+    Promise.all(ids.map((id) => api.deleteMenuItem(id))).catch(console.error)
     setMenuItems((prev) => prev.filter((i) => !ids.includes(i._id)))
   }, [])
 
   const toggleMenuItemDisponible = useCallback((id: string) => {
-    setMenuItems((prev) => prev.map((i) => i._id === id ? { ...i, disponible: !i.disponible } : i))
-  }, [])
+    const item = menuItemsList.find((i) => i._id === id)
+    if (!item) return
+    api.updateMenuItem(id, { disponible: !item.disponible }).then((updated) => {
+      setMenuItems((prev) => prev.map((i) => i._id === id ? updated as MenuItem : i))
+    }).catch(console.error)
+  }, [menuItemsList])
 
   const setMenuItemsDisponible = useCallback((ids: string[], disponible: boolean) => {
+    Promise.all(ids.map((id) => api.updateMenuItem(id, { disponible }))).catch(console.error)
     setMenuItems((prev) => prev.map((i) => ids.includes(i._id) ? { ...i, disponible } : i))
   }, [])
 
   // --- Orders ---
-  const createOrder = useCallback((order: Omit<Orden, "_id" | "fecha_creacion" | "historial_estados" | "tiene_resena" | "estado">) => {
-    const now = new Date().toISOString()
-    const orderId = `o${Date.now()}`
-    const newOrder: Orden = {
-      ...order,
-      _id: orderId,
-      estado: "pendiente",
-      historial_estados: [{ estado: "pendiente", timestamp: now, actor_id: order.usuario_id }],
-      fecha_creacion: now,
-      tiene_resena: false,
-    }
-    setOrdenes((prev) => [...prev, newOrder])
+  const createOrder = useCallback(async (order: Omit<Orden, "_id" | "fecha_creacion" | "historial_estados" | "tiene_resena" | "estado">) => {
+    const created = await api.createOrder(order)
+    setOrdenes((prev) => [created as Orden, ...prev])
 
-    // Increment veces_ordenado for each item
-    const itemIds = order.items.map((i: ItemOrden) => i.item_id)
-    setMenuItems((prev) => prev.map((mi) => {
-      if (itemIds.includes(mi._id)) {
-        const orderItem = order.items.find((i: ItemOrden) => i.item_id === mi._id)
-        return { ...mi, veces_ordenado: mi.veces_ordenado + (orderItem?.cantidad || 1) }
-      }
-      return mi
-    }))
-
-    // Add notification for owner
     const rest = restaurantes.find((r) => r._id === order.restaurante_id)
     if (rest) {
       const notif: Notification = {
         id: `n${Date.now()}`,
-        orden_id: orderId,
+        orden_id: created._id,
         restaurante_id: order.restaurante_id,
-        mensaje: `Nuevo pedido en ${rest.nombre} - Q${order.total}`,
-        timestamp: now,
+        mensaje: `Nuevo pedido en ${rest.nombre} - Q${created.total ?? (order as any).total}`,
+        timestamp: new Date().toISOString(),
         leida: false,
       }
       setNotifications((prev) => [notif, ...prev])
     }
 
-    return orderId
+    return created._id as string
   }, [restaurantes])
 
-  const advanceOrderStatus = useCallback((orderId: string, actorId: string) => {
-    setOrdenes((prev) => prev.map((o) => {
-      if (o._id === orderId) {
-        const currentIdx = STATUS_FLOW.indexOf(o.estado)
-        if (currentIdx >= 0 && currentIdx < STATUS_FLOW.length - 1) {
-          const nextStatus = STATUS_FLOW[currentIdx + 1]
-          const now = new Date().toISOString()
-          return {
-            ...o,
-            estado: nextStatus,
-            historial_estados: [...o.historial_estados, { estado: nextStatus, timestamp: now, actor_id: actorId }],
-            ...(nextStatus === "entregado" ? { fecha_entrega_real: now } : {})
-          }
-        }
-      }
-      return o
-    }))
-  }, [])
+  const advanceOrderStatus = useCallback(async (orderId: string, _actorId: string) => {
+    const orden = ordenes.find((o) => o._id === orderId)
+    if (!orden) return
+    const currentIdx = STATUS_FLOW.indexOf(orden.estado)
+    if (currentIdx < 0 || currentIdx >= STATUS_FLOW.length - 1) return
+    const nextStatus = STATUS_FLOW[currentIdx + 1]
+    const updated = await api.updateOrderStatus(orderId, nextStatus)
+    setOrdenes((prev) => prev.map((o) => o._id === orderId ? updated as Orden : o))
+  }, [ordenes])
 
-  const cancelOrder = useCallback((orderId: string, actorId: string, nota?: string) => {
-    setOrdenes((prev) => prev.map((o) => {
-      if (o._id === orderId && o.estado !== "entregado" && o.estado !== "cancelado") {
-        return {
-          ...o,
-          estado: "cancelado" as EstadoOrden,
-          historial_estados: [...o.historial_estados, { estado: "cancelado", timestamp: new Date().toISOString(), actor_id: actorId, nota }]
-        }
-      }
-      return o
-    }))
+  const cancelOrder = useCallback(async (orderId: string, _actorId: string, _nota?: string) => {
+    const updated = await api.updateOrderStatus(orderId, "cancelado")
+    setOrdenes((prev) => prev.map((o) => o._id === orderId ? updated as Orden : o))
   }, [])
 
   // --- Reviews ---
-  const addResena = useCallback((resena: Omit<Resena, "_id" | "fecha" | "activa" | "likes">) => {
-    const newResena: Resena = {
-      ...resena,
-      _id: `re${Date.now()}`,
-      likes: [],
-      activa: true,
-      fecha: new Date().toISOString(),
-    }
-    setResenas((prev) => [...prev, newResena])
-
-    // Update restaurante calificacion_prom and total_resenas
-    if (resena.restaurante_id) {
-      setRestaurantes((prev) => prev.map((r) => {
-        if (r._id === resena.restaurante_id) {
-          const allReviews = [...resenas.filter((re) => re.restaurante_id === r._id && re.activa), newResena]
-          const avg = allReviews.reduce((sum, re) => sum + re.calificacion, 0) / allReviews.length
-          return { ...r, calificacion_prom: Math.round(avg * 10) / 10, total_resenas: allReviews.length }
-        }
-        return r
-      }))
-    }
-
-    // Mark order as reviewed
-    if (resena.orden_id) {
-      setOrdenes((prev) => prev.map((o) => o._id === resena.orden_id ? { ...o, tiene_resena: true } : o))
-    }
-  }, [resenas])
+  const addResena = useCallback(async (resena: Omit<Resena, "_id" | "fecha" | "activa" | "likes">) => {
+    const created = await api.createReview(resena)
+    setResenas((prev) => [...prev, { ...created, likes: created.likes ?? [], activa: created.activa ?? true } as Resena])
+    // Refresh restaurant ratings
+    setRestaurantes((prev) => prev.map((r) => {
+      if (r._id !== resena.restaurante_id) return r
+      const n = r.total_resenas + 1
+      const avg = (r.calificacion_prom * r.total_resenas + resena.calificacion) / n
+      return { ...r, calificacion_prom: Math.round(avg * 10) / 10, total_resenas: n }
+    }))
+  }, [])
 
   const toggleResenaActiva = useCallback((id: string) => {
     setResenas((prev) => prev.map((r) => r._id === id ? { ...r, activa: !r.activa } : r))
   }, [])
 
   const deleteResenas = useCallback((ids: string[]) => {
+    Promise.all(ids.map((id) => api.deleteReview(id))).catch(console.error)
     setResenas((prev) => prev.filter((r) => !ids.includes(r._id)))
-    // Unmark tiene_resena on affected orders
-    setOrdenes((prev) => prev.map((o) => {
-      const resena = resenas.find((r) => ids.includes(r._id) && r.orden_id === o._id)
-      return resena ? { ...o, tiene_resena: false } : o
-    }))
-  }, [resenas])
+  }, [])
 
+  const toggleLikeResena = useCallback((resenaId: string, userId: string) => {
+    setResenas((prev) => prev.map((r) => {
+      if (r._id !== resenaId) return r
+      const hasLike = r.likes.includes(userId)
+      return { ...r, likes: hasLike ? r.likes.filter((id) => id !== userId) : [...r.likes, userId] }
+    }))
+  }, [])
+
+  // --- Admin Users ---
   const toggleUserActivo = useCallback((id: string) => {
     setAdminUsers((prev) => prev.map((u) => u._id === id ? { ...u, activo: !u.activo } : u))
   }, [])
@@ -344,14 +310,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const deleteUsers = useCallback((ids: string[]) => {
     setAdminUsers((prev) => prev.filter((u) => !ids.includes(u._id)))
-  }, [])
-
-  const toggleLikeResena = useCallback((resenaId: string, userId: string) => {
-    setResenas((prev) => prev.map((r) => {
-      if (r._id !== resenaId) return r
-      const hasLike = r.likes.includes(userId)
-      return { ...r, likes: hasLike ? r.likes.filter((id) => id !== userId) : [...r.likes, userId] }
-    }))
   }, [])
 
   // --- Notifications ---
@@ -365,8 +323,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   return (
     <DataContext.Provider value={{
-      restaurantes, menuItems: menuItemsList, ordenes, resenas, notifications,
+      restaurantes, menuItems: menuItemsList, ordenes, resenas, notifications, loading,
       adminUsers, toggleUserActivo, deleteUser, deleteUsers,
+      loadMenuItems, loadOrdenes,
       addRestaurante, updateRestaurante, deleteRestaurante, toggleRestauranteActivo,
       addMenuItem, updateMenuItem, deleteMenuItem, deleteMenuItems, toggleMenuItemDisponible, setMenuItemsDisponible,
       createOrder, advanceOrderStatus, cancelOrder,
@@ -385,7 +344,7 @@ export function useData() {
 }
 
 // ============================================================
-// Cart Context
+// Cart Context (client-side only, no API)
 // ============================================================
 
 export interface CartItem {
@@ -417,7 +376,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addItem = useCallback((item: CartItem) => {
     setItems((prev) => {
-      // If cart has items from a different restaurant, clear first
       if (prev.length > 0 && prev[0].restaurante_id !== item.restaurante_id) {
         setRestauranteId(item.restaurante_id)
         return [item]
@@ -440,10 +398,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateQuantity = useCallback((itemId: string, qty: number) => {
-    if (qty <= 0) {
-      removeItem(itemId)
-      return
-    }
+    if (qty <= 0) { removeItem(itemId); return }
     setItems((prev) => prev.map((i) => i.item_id === itemId ? { ...i, cantidad: qty } : i))
   }, [removeItem])
 

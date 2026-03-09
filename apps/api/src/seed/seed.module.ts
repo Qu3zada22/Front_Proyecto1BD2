@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ConfigModule } from '@nestjs/config';
 import { SeedController } from './seed.controller';
 import { SeedService } from './seed.service';
 import { Usuario, UsuarioSchema } from '../usuarios/schemas/usuario.schema';
@@ -10,6 +11,7 @@ import { Resena, ResenaSchema } from '../resenas/schemas/resena.schema';
 
 @Module({
     imports: [
+        ConfigModule,
         MongooseModule.forFeature([
             { name: Usuario.name, schema: UsuarioSchema },
             { name: Restaurante.name, schema: RestauranteSchema },
