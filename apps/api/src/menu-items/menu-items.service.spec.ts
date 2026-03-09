@@ -243,7 +243,7 @@ describe('MenuItemsService', () => {
 
       const result = await service.removeByRestaurant(restauranteId);
 
-      expect(mockModel.deleteMany).toHaveBeenCalledWith({ restaurante_id: restauranteId });
+      expect(mockModel.deleteMany).toHaveBeenCalledWith({ restaurante_id: new Types.ObjectId(restauranteId) });
       expect(result).toEqual({ deleted: 8 });
     });
   });

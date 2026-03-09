@@ -5,7 +5,7 @@ export type MenuItemDocument = HydratedDocument<MenuItem>;
 
 export type CategoriaMenu = 'entrada' | 'principal' | 'postre' | 'bebida' | 'extra';
 
-@Schema({ timestamps: true, collection: 'menu_items' })
+@Schema({ timestamps: false, collection: 'menu_items' })
 export class MenuItem {
     @Prop({ type: Types.ObjectId, ref: 'Restaurante', required: true })
     restaurante_id: Types.ObjectId;
@@ -26,12 +26,15 @@ export class MenuItem {
     // Campo array → índice multikey automático
     @Prop({ type: [String], default: [] }) etiquetas: string[];
 
-    @Prop() imagen?: string;
+    // GridFS reference — ObjectId devuelto por POST /api/files/upload
+    @Prop({ type: Types.ObjectId }) imagen_id?: Types.ObjectId;
+    @Prop() imagen?: string;  // legacy string URL (compatibilidad)
 
     @Prop({ default: true }) disponible: boolean;
 
     @Prop({ default: 0 }) veces_ordenado: number;
     @Prop({ default: 0 }) orden_display: number;
+    @Prop({ default: () => new Date() }) fecha_creacion: Date;
 }
 
 export const MenuItemSchema = SchemaFactory.createForClass(MenuItem);
