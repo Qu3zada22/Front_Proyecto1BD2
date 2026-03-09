@@ -31,13 +31,13 @@ export class OrdenesService {
 
     // Transacción ACID: insert orden + bulkWrite $inc veces_ordenado
     async create(dto: CreateOrdenDto): Promise<OrdenDocument> {
-        // OBS-01: Validar FK — usuario_id y restaurante_id deben existir
+        // OBS-01/02: Validar FK — usuario_id debe existir; restaurante_id debe existir y estar activo
         const [userExists, restExists] = await Promise.all([
             this.usuarioModel.countDocuments({ _id: dto.usuario_id }),
-            this.restauranteModel.countDocuments({ _id: dto.restaurante_id }),
+            this.restauranteModel.countDocuments({ _id: dto.restaurante_id, activo: true }),
         ]);
         if (!userExists) throw new BadRequestException('El usuario referenciado no existe');
-        if (!restExists) throw new BadRequestException('El restaurante referenciado no existe');
+        if (!restExists) throw new BadRequestException('El restaurante referenciado no existe o está inactivo');
 
         const session = await this.connection.startSession();
         session.startTransaction();
@@ -46,24 +46,38 @@ export class OrdenesService {
             const uniqueItemIds = [...new Set(dto.items.map(i => new Types.ObjectId(i.menu_item_id).toHexString()))]
                 .map(hex => new Types.ObjectId(hex));
             const dbItems = await this.menuItemModel
-                .find({ _id: { $in: uniqueItemIds }, disponible: true }, { _id: 1, nombre: 1, precio: 1 }, { session })
+                .find(
+                    {
+                        _id: { $in: uniqueItemIds },
+                        disponible: true,
+                        // OBS-01: validar que todos los items pertenezcan a este restaurante
+                        restaurante_id: new Types.ObjectId(dto.restaurante_id),
+                    },
+                    { _id: 1, nombre: 1, precio: 1 },
+                    { session },
+                )
                 .lean();
             if (dbItems.length !== uniqueItemIds.length) {
-                throw new BadRequestException('Uno o más platillos no están disponibles');
+                throw new BadRequestException(
+                    'Uno o más platillos no están disponibles o no pertenecen a este restaurante',
+                );
             }
 
             // Paso 2 (PDF spec): recalcular snapshot con precios actuales de BD
             const dbMap = new Map((dbItems as any[]).map(i => [i._id.toHexString(), i]));
             const itemsMapped = dto.items.map((i) => {
                 const dbItem = dbMap.get(new Types.ObjectId(i.menu_item_id).toHexString())!;
+                // BUG-01: parseFloat convierte Decimal128 (seed) y number (API) por igual
+                // .lean() devuelve Decimal128 objects sin type-casting; aritmética directa da NaN
+                const precio = parseFloat((dbItem as any).precio?.toString() ?? '0');
                 return {
                     item_id: new Types.ObjectId(i.menu_item_id),
                     menu_item_id: new Types.ObjectId(i.menu_item_id),
                     nombre: (dbItem as any).nombre,
-                    precio_unitario: (dbItem as any).precio,
-                    precio: (dbItem as any).precio,
+                    precio_unitario: precio,
+                    precio: precio,
                     cantidad: i.cantidad,
-                    subtotal: (dbItem as any).precio * i.cantidad,
+                    subtotal: precio * i.cantidad,
                     ...(i.notas && { notas: i.notas }),
                 };
             });

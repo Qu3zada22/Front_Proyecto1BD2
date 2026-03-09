@@ -181,14 +181,14 @@ describe('OrdenesService', () => {
       expect(options).toMatchObject({ session: mockSession });
     });
 
-    it('should check disponible:true for all items inside the ACID session and read nombre+precio', async () => {
+    it('should check disponible:true and restaurante_id for all items inside the ACID session', async () => {
       mockOrdenModel.create.mockResolvedValue([{ _id: 'orden1', total: 110 }]);
       mockMenuItemModel.bulkWrite.mockResolvedValue({});
 
       await service.create(baseDto as any);
 
       expect(mockMenuItemModel.find).toHaveBeenCalledWith(
-        expect.objectContaining({ disponible: true }),
+        expect.objectContaining({ disponible: true, restaurante_id: expect.anything() }),
         { _id: 1, nombre: 1, precio: 1 },
         { session: mockSession },
       );
@@ -277,11 +277,45 @@ describe('OrdenesService', () => {
       await expect(service.create(baseDto as any)).rejects.toThrow('usuario referenciado no existe');
     });
 
-    it('should throw BadRequestException when restaurante_id does not exist (OBS-01 FK)', async () => {
+    it('should throw BadRequestException when restaurante_id does not exist or is inactive (OBS-01/02 FK)', async () => {
       mockRestauranteModel.countDocuments.mockResolvedValue(0);
 
       await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
-      await expect(service.create(baseDto as any)).rejects.toThrow('restaurante referenciado no existe');
+      await expect(service.create(baseDto as any)).rejects.toThrow('restaurante referenciado no existe o está inactivo');
+    });
+
+    it('should parse Decimal128 precio from DB correctly and compute total without NaN (BUG-01 Decimal128)', async () => {
+      // Simula el objeto Decimal128 que devuelve .lean() para datos del seed
+      const dec128 = (val: number) => ({ toString: () => String(val), _bsontype: 'Decimal128' });
+      mockMenuItemModel.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([
+          { _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger', precio: dec128(45) },
+          { _id: new Types.ObjectId('507f1f77bcf86cd799439032'), nombre: 'Fries',  precio: dec128(20) },
+        ]),
+      });
+      mockOrdenModel.create.mockResolvedValue([{ _id: 'orden1', total: 110 }]);
+      mockMenuItemModel.bulkWrite.mockResolvedValue({});
+
+      await service.create(baseDto as any);
+
+      const createCall = mockOrdenModel.create.mock.calls[0][0][0];
+      expect(isNaN(createCall.total)).toBe(false);
+      expect(createCall.total).toBe(110); // 45*2 + 20*1
+      expect(createCall.items[0].precio_unitario).toBe(45);
+      expect(createCall.items[1].precio_unitario).toBe(20);
+    });
+
+    it('should throw BadRequestException when items belong to a different restaurant (OBS-01 cross-restaurant)', async () => {
+      // Solo devuelve 1 de 2 items (el filtro restaurante_id excluye el otro)
+      mockMenuItemModel.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([
+          { _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger', precio: 45 },
+        ]),
+      });
+
+      await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
+      await expect(service.create(baseDto as any)).rejects.toThrow('no pertenecen a este restaurante');
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
     });
   });
 
