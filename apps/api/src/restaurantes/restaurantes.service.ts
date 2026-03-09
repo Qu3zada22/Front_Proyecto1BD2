@@ -1,12 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Connection, Model } from 'mongoose';
 import { Restaurante, RestauranteDocument } from './schemas/restaurante.schema';
+import { MenuItem } from '../menu-items/schemas/menu-item.schema';
+import { Orden } from '../ordenes/schemas/orden.schema';
 
 @Injectable()
 export class RestaurantesService {
     constructor(
         @InjectModel(Restaurante.name) private restauranteModel: Model<RestauranteDocument>,
+        @InjectModel(MenuItem.name) private menuItemModel: Model<any>,
+        @InjectModel(Orden.name) private ordenModel: Model<any>,
+        @InjectConnection() private connection: Connection,
     ) { }
 
     async create(data: any): Promise<RestauranteDocument> {
@@ -76,5 +81,45 @@ export class RestaurantesService {
         const result = await this.restauranteModel.findByIdAndDelete(id).exec();
         if (!result) throw new NotFoundException('Restaurante no encontrado');
         return { deleted: true };
+    }
+
+    // Transacción ACID: cancelar restaurante + platillos + órdenes activas
+    async cancelarRestaurante(id: string): Promise<{ cancelado: boolean; restaurante_id: string }> {
+        const session = await this.connection.startSession();
+        session.startTransaction();
+        try {
+            const restaurante = await this.restauranteModel
+                .findByIdAndUpdate(id, { $set: { activo: false } }, { new: true, session })
+                .exec();
+            if (!restaurante) throw new NotFoundException('Restaurante no encontrado');
+
+            await this.menuItemModel.updateMany(
+                { restaurante_id: restaurante._id },
+                { $set: { disponible: false } },
+                { session },
+            );
+
+            const histEntry = {
+                estado: 'cancelado',
+                timestamp: new Date(),
+                nota: 'Restaurante cancelado',
+            };
+            await this.ordenModel.updateMany(
+                {
+                    restaurante_id: restaurante._id,
+                    estado: { $in: ['pendiente', 'en_proceso', 'en_camino'] },
+                },
+                { $set: { estado: 'cancelado' }, $push: { historial_estados: histEntry } },
+                { session },
+            );
+
+            await session.commitTransaction();
+            return { cancelado: true, restaurante_id: id };
+        } catch (err) {
+            await session.abortTransaction();
+            throw err;
+        } finally {
+            await session.endSession();
+        }
     }
 }

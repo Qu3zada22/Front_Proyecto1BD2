@@ -55,6 +55,16 @@ export class RestaurantesController {
         return this.restaurantesService.update(id, dto);
     }
 
+    @Patch(':id/cancel')
+    @ApiOperation({
+        summary: 'Cancelar restaurante (ACID)',
+        description: 'Transacción ACID: marca restaurante activo=false, platillos disponible=false y cancela todas las órdenes activas del restaurante.',
+    })
+    @ApiParam({ name: 'id', description: 'ObjectId del restaurante' })
+    cancelar(@Param('id', ParseMongoIdPipe) id: string) {
+        return this.restaurantesService.cancelarRestaurante(id);
+    }
+
     @Delete(':id')
     @ApiOperation({ summary: 'Eliminar restaurante' })
     @ApiParam({ name: 'id', description: 'ObjectId del restaurante' })

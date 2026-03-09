@@ -51,6 +51,7 @@ export class ReportesService {
                     from: 'resenas',
                     localField: '_id',
                     foreignField: 'restaurante_id',
+                    pipeline: [{ $match: { activa: true } }],
                     as: 'resenas',
                 },
             },

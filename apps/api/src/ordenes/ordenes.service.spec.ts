@@ -47,6 +47,7 @@ const mockOrdenModel = {
 };
 
 const mockMenuItemModel = {
+  find: jest.fn(),
   bulkWrite: jest.fn(),
 };
 
@@ -57,6 +58,14 @@ describe('OrdenesService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+
+    // Default: ambos items del baseDto están disponibles
+    mockMenuItemModel.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([
+        { _id: '507f1f77bcf86cd799439031' },
+        { _id: '507f1f77bcf86cd799439032' },
+      ]),
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -146,6 +155,50 @@ describe('OrdenesService', () => {
 
       const [, options] = mockMenuItemModel.bulkWrite.mock.calls[0];
       expect(options).toMatchObject({ session: mockSession });
+    });
+
+    it('should check disponible:true for all items inside the ACID session', async () => {
+      mockOrdenModel.create.mockResolvedValue([{ _id: 'orden1', total: 110 }]);
+      mockMenuItemModel.bulkWrite.mockResolvedValue({});
+
+      await service.create(baseDto as any);
+
+      expect(mockMenuItemModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({ disponible: true }),
+        { _id: 1 },
+        { session: mockSession },
+      );
+    });
+
+    it('should throw BadRequestException when an item is not disponible', async () => {
+      // find returns only 1 of 2 items → one is unavailable
+      mockMenuItemModel.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([{ _id: '507f1f77bcf86cd799439031' }]),
+      });
+
+      await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
+      await expect(service.create(baseDto as any)).rejects.toThrow('no están disponibles');
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+    });
+
+    it('should NOT throw when the same menu_item_id appears twice in the order (deduplication)', async () => {
+      const duplicateItemDto = {
+        ...baseDto,
+        items: [
+          { menu_item_id: '507f1f77bcf86cd799439031', nombre: 'Burger', precio: 45, cantidad: 2 },
+          { menu_item_id: '507f1f77bcf86cd799439031', nombre: 'Burger', precio: 45, cantidad: 1 },
+        ],
+      };
+      // find returns 1 unique item (deduped) — check should pass (1 === 1)
+      mockMenuItemModel.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([{ _id: '507f1f77bcf86cd799439031' }]),
+      });
+      mockOrdenModel.create.mockResolvedValue([{ _id: 'orden1', total: 135 }]);
+      mockMenuItemModel.bulkWrite.mockResolvedValue({});
+
+      await expect(service.create(duplicateItemDto as any)).resolves.toBeDefined();
+      expect(mockSession.abortTransaction).not.toHaveBeenCalled();
+      expect(mockSession.commitTransaction).toHaveBeenCalled();
     });
 
     it('should abort transaction and throw BadRequestException on error', async () => {

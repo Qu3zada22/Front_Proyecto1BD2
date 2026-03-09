@@ -35,6 +35,17 @@ export class OrdenesService {
         const session = await this.connection.startSession();
         session.startTransaction();
         try {
+            // Paso 1 (PDF spec): verificar disponible:true en todos los platillos
+            // Deduplicar IDs: $in deduplica en MongoDB, el length debe compararse contra únicos
+            const uniqueItemIds = [...new Set(itemsMapped.map(i => i.item_id.toHexString()))]
+                .map(hex => new Types.ObjectId(hex));
+            const disponibles = await this.menuItemModel
+                .find({ _id: { $in: uniqueItemIds }, disponible: true }, { _id: 1 }, { session })
+                .lean();
+            if (disponibles.length !== uniqueItemIds.length) {
+                throw new BadRequestException('Uno o más platillos no están disponibles');
+            }
+
             const [orden] = await this.ordenModel.create(
                 [{ ...dto, items: itemsMapped, total }] as any[],
                 { session },
@@ -53,6 +64,7 @@ export class OrdenesService {
             return orden;
         } catch (err) {
             await session.abortTransaction();
+            if (err instanceof BadRequestException) throw err;
             throw new BadRequestException('Error al crear la orden: ' + (err as Error).message);
         } finally {
             await session.endSession();
