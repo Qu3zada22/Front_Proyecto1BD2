@@ -165,13 +165,18 @@ describe('ReportesService', () => {
         },
       });
 
-      // Stage 3: $sort by avg_calificacion desc
+      // Stage 3: $match minimum 5 reviews (per design doc)
       expect(pipeline[3]).toEqual({
+        $match: { cantidad_resenas: { $gte: 5 } },
+      });
+
+      // Stage 4: $sort by avg_calificacion desc
+      expect(pipeline[4]).toEqual({
         $sort: { avg_calificacion: -1, cantidad_resenas: -1 },
       });
 
-      // Stage 4: $limit applied with the argument
-      expect(pipeline[4]).toEqual({ $limit: 5 });
+      // Stage 5: $limit applied with the argument
+      expect(pipeline[5]).toEqual({ $limit: 5 });
 
       expect(result).toEqual(expected);
     });

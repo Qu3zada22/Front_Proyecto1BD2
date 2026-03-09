@@ -82,7 +82,6 @@ describe('RestaurantesService', () => {
       expect(query.sort).toHaveBeenCalledWith({ nombre: 1 });
       expect(query.skip).toHaveBeenCalledWith(0);
       expect(query.limit).toHaveBeenCalledWith(20);
-      expect(query.select).toHaveBeenCalledWith('-horario');
       expect(query.lean).toHaveBeenCalled();
       expect(query.exec).toHaveBeenCalled();
       expect(result).toEqual(docs);

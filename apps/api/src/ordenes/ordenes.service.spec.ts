@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getModelToken, InjectConnection } from '@nestjs/mongoose';
+import { getModelToken } from '@nestjs/mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { OrdenesService } from './ordenes.service';
 import { Orden } from './schemas/orden.schema';
+import { MenuItem } from '../menu-items/schemas/menu-item.schema';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ const mockConnection = {
   startSession: jest.fn().mockResolvedValue(mockSession),
 };
 
-const mockModel = {
+const mockOrdenModel = {
   create: jest.fn(),
   find: jest.fn(),
   findById: jest.fn(),
@@ -43,6 +44,10 @@ const mockModel = {
   deleteMany: jest.fn(),
   aggregate: jest.fn(),
   distinct: jest.fn(),
+};
+
+const mockMenuItemModel = {
+  bulkWrite: jest.fn(),
 };
 
 // ── suite ─────────────────────────────────────────────────────────────────────
@@ -58,7 +63,11 @@ describe('OrdenesService', () => {
         OrdenesService,
         {
           provide: getModelToken(Orden.name),
-          useValue: mockModel,
+          useValue: mockOrdenModel,
+        },
+        {
+          provide: getModelToken(MenuItem.name),
+          useValue: mockMenuItemModel,
         },
         {
           provide: getConnectionToken(),
@@ -70,15 +79,15 @@ describe('OrdenesService', () => {
     service = module.get<OrdenesService>(OrdenesService);
   });
 
-  // ── create (transaction) ─────────────────────────────────────────────────────
+  // ── create (ACID transaction + bulkWrite) ────────────────────────────────────
 
   describe('create', () => {
     const baseDto = {
       usuario_id: '507f1f77bcf86cd799439011',
       restaurante_id: '507f1f77bcf86cd799439012',
       items: [
-        { menu_item_id: 'mi1', nombre: 'Burger', precio: 45, cantidad: 2 },
-        { menu_item_id: 'mi2', nombre: 'Fries', precio: 20, cantidad: 1 },
+        { menu_item_id: '507f1f77bcf86cd799439031', nombre: 'Burger', precio: 45, cantidad: 2 },
+        { menu_item_id: '507f1f77bcf86cd799439032', nombre: 'Fries', precio: 20, cantidad: 1 },
       ],
       direccion_entrega: { calle: '4a Ave', ciudad: 'Guatemala', pais: 'GT' },
     };
@@ -86,13 +95,14 @@ describe('OrdenesService', () => {
     it('should start a transaction and commit on success', async () => {
       const expectedTotal = 45 * 2 + 20 * 1; // 110
       const created = { _id: 'orden1', total: expectedTotal };
-      mockModel.create.mockResolvedValue([created]);
+      mockOrdenModel.create.mockResolvedValue([created]);
+      mockMenuItemModel.bulkWrite.mockResolvedValue({ modifiedCount: 2 });
 
       const result = await service.create(baseDto as any);
 
       expect(mockConnection.startSession).toHaveBeenCalled();
       expect(mockSession.startTransaction).toHaveBeenCalled();
-      expect(mockModel.create).toHaveBeenCalledWith(
+      expect(mockOrdenModel.create).toHaveBeenCalledWith(
         [expect.objectContaining({ total: expectedTotal })],
         { session: mockSession },
       );
@@ -104,16 +114,42 @@ describe('OrdenesService', () => {
 
     it('should calculate total correctly from items (precio * cantidad)', async () => {
       const created = { _id: 'orden1', total: 110 };
-      mockModel.create.mockResolvedValue([created]);
+      mockOrdenModel.create.mockResolvedValue([created]);
+      mockMenuItemModel.bulkWrite.mockResolvedValue({});
 
       await service.create(baseDto as any);
 
-      const createCall = mockModel.create.mock.calls[0][0][0];
+      const createCall = mockOrdenModel.create.mock.calls[0][0][0];
       expect(createCall.total).toBe(110); // 45*2 + 20*1
     });
 
+    it('should call bulkWrite to $inc veces_ordenado for each item inside the transaction', async () => {
+      const created = { _id: 'orden1', total: 110 };
+      mockOrdenModel.create.mockResolvedValue([created]);
+      mockMenuItemModel.bulkWrite.mockResolvedValue({ modifiedCount: 2 });
+
+      await service.create(baseDto as any);
+
+      expect(mockMenuItemModel.bulkWrite).toHaveBeenCalledTimes(1);
+      const [bulkOps] = mockMenuItemModel.bulkWrite.mock.calls[0];
+
+      expect(bulkOps).toHaveLength(2);
+      expect(bulkOps[0].updateOne.update).toEqual({ $inc: { veces_ordenado: 2 } });
+      expect(bulkOps[1].updateOne.update).toEqual({ $inc: { veces_ordenado: 1 } });
+    });
+
+    it('should pass session to bulkWrite so it runs inside the ACID transaction', async () => {
+      mockOrdenModel.create.mockResolvedValue([{ _id: 'o1', total: 110 }]);
+      mockMenuItemModel.bulkWrite.mockResolvedValue({});
+
+      await service.create(baseDto as any);
+
+      const [, options] = mockMenuItemModel.bulkWrite.mock.calls[0];
+      expect(options).toMatchObject({ session: mockSession });
+    });
+
     it('should abort transaction and throw BadRequestException on error', async () => {
-      mockModel.create.mockRejectedValue(new Error('DB error'));
+      mockOrdenModel.create.mockRejectedValue(new Error('DB error'));
 
       await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
       await expect(service.create(baseDto as any)).rejects.toThrow('Error al crear la orden');
@@ -123,7 +159,7 @@ describe('OrdenesService', () => {
     });
 
     it('should always call endSession even when an error occurs', async () => {
-      mockModel.create.mockRejectedValue(new Error('DB failure'));
+      mockOrdenModel.create.mockRejectedValue(new Error('DB failure'));
 
       try {
         await service.create(baseDto as any);
@@ -141,14 +177,14 @@ describe('OrdenesService', () => {
     it('should return orders with populated fields and default pagination', async () => {
       const ordenes = [{ _id: 'o1' }, { _id: 'o2' }];
       const query = createMockQuery(ordenes);
-      mockModel.find.mockReturnValue(query);
+      mockOrdenModel.find.mockReturnValue(query);
 
       const result = await service.findAll({});
 
-      expect(mockModel.find).toHaveBeenCalledWith({});
+      expect(mockOrdenModel.find).toHaveBeenCalledWith({});
       expect(query.populate).toHaveBeenCalledWith('usuario_id', 'nombre email');
       expect(query.populate).toHaveBeenCalledWith('restaurante_id', 'nombre direccion');
-      expect(query.sort).toHaveBeenCalledWith({ createdAt: -1 });
+      expect(query.sort).toHaveBeenCalledWith({ fecha_creacion: -1 });
       expect(query.skip).toHaveBeenCalledWith(0);
       expect(query.limit).toHaveBeenCalledWith(20);
       expect(query.lean).toHaveBeenCalled();
@@ -159,11 +195,11 @@ describe('OrdenesService', () => {
     it('should filter by cliente_id converting to ObjectId using usuario_id field', async () => {
       const clienteId = '507f1f77bcf86cd799439011';
       const query = createMockQuery([]);
-      mockModel.find.mockReturnValue(query);
+      mockOrdenModel.find.mockReturnValue(query);
 
       await service.findAll({ cliente_id: clienteId });
 
-      const callArg = mockModel.find.mock.calls[0][0];
+      const callArg = mockOrdenModel.find.mock.calls[0][0];
       expect(callArg.usuario_id).toBeInstanceOf(Types.ObjectId);
       expect(callArg.usuario_id.toString()).toBe(clienteId);
     });
@@ -171,29 +207,29 @@ describe('OrdenesService', () => {
     it('should filter by restaurante_id converting to ObjectId', async () => {
       const restauranteId = '507f1f77bcf86cd799439012';
       const query = createMockQuery([]);
-      mockModel.find.mockReturnValue(query);
+      mockOrdenModel.find.mockReturnValue(query);
 
       await service.findAll({ restaurante_id: restauranteId });
 
-      const callArg = mockModel.find.mock.calls[0][0];
+      const callArg = mockOrdenModel.find.mock.calls[0][0];
       expect(callArg.restaurante_id).toBeInstanceOf(Types.ObjectId);
       expect(callArg.restaurante_id.toString()).toBe(restauranteId);
     });
 
     it('should filter by estado', async () => {
       const query = createMockQuery([]);
-      mockModel.find.mockReturnValue(query);
+      mockOrdenModel.find.mockReturnValue(query);
 
       await service.findAll({ estado: 'entregado' });
 
-      expect(mockModel.find).toHaveBeenCalledWith(
+      expect(mockOrdenModel.find).toHaveBeenCalledWith(
         expect.objectContaining({ estado: 'entregado' }),
       );
     });
 
     it('should apply custom skip and limit', async () => {
       const query = createMockQuery([]);
-      mockModel.find.mockReturnValue(query);
+      mockOrdenModel.find.mockReturnValue(query);
 
       await service.findAll({ skip: 5, limit: 10 });
 
@@ -208,11 +244,11 @@ describe('OrdenesService', () => {
     it('should return the orden with populated fields when found', async () => {
       const doc = { _id: 'o1', estado: 'pendiente' };
       const query = createMockQuery(doc);
-      mockModel.findById.mockReturnValue(query);
+      mockOrdenModel.findById.mockReturnValue(query);
 
       const result = await service.findOne('o1');
 
-      expect(mockModel.findById).toHaveBeenCalledWith('o1');
+      expect(mockOrdenModel.findById).toHaveBeenCalledWith('o1');
       expect(query.populate).toHaveBeenCalledWith('usuario_id', 'nombre email telefono');
       expect(query.populate).toHaveBeenCalledWith('restaurante_id', 'nombre telefono direccion');
       expect(query.lean).toHaveBeenCalled();
@@ -221,7 +257,7 @@ describe('OrdenesService', () => {
 
     it('should throw NotFoundException when orden is not found', async () => {
       const query = createMockQuery(null);
-      mockModel.findById.mockReturnValue(query);
+      mockOrdenModel.findById.mockReturnValue(query);
 
       await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
       await expect(service.findOne('nonexistent')).rejects.toThrow('Orden no encontrada');
@@ -231,27 +267,71 @@ describe('OrdenesService', () => {
   // ── updateStatus ─────────────────────────────────────────────────────────────
 
   describe('updateStatus', () => {
-    it('should update status with $set operator and return updated orden', async () => {
+    it('should update with $set estado AND $push to historial_estados', async () => {
       const updated = { _id: 'o1', estado: 'confirmado' };
       const query = createMockQuery(updated);
-      mockModel.findByIdAndUpdate.mockReturnValue(query);
+      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
 
       const result = await service.updateStatus('o1', 'confirmado');
 
-      expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
-        'o1',
-        { $set: { estado: 'confirmado' } },
-        { new: true },
-      );
+      const [id, update, opts] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
+      expect(id).toBe('o1');
+      expect(update.$set.estado).toBe('confirmado');
+      expect(update.$push.historial_estados).toMatchObject({ estado: 'confirmado' });
+      expect(update.$push.historial_estados.timestamp).toBeInstanceOf(Date);
+      expect(opts).toEqual({ new: true });
       expect(result).toEqual(updated);
     });
 
-    it('should accept all valid estado values', async () => {
-      const validStates = ['pendiente', 'confirmado', 'en_camino', 'entregado', 'cancelado'];
+    it('should set fecha_entrega_real when estado is "entregado"', async () => {
+      const query = createMockQuery({ _id: 'o1', estado: 'entregado' });
+      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
+
+      await service.updateStatus('o1', 'entregado');
+
+      const [, update] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
+      expect(update.$set.fecha_entrega_real).toBeInstanceOf(Date);
+    });
+
+    it('should NOT set fecha_entrega_real for non-entregado states', async () => {
+      const query = createMockQuery({ _id: 'o1', estado: 'en_camino' });
+      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
+
+      await service.updateStatus('o1', 'en_camino');
+
+      const [, update] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
+      expect(update.$set.fecha_entrega_real).toBeUndefined();
+    });
+
+    it('should include actor_id in historial entry when provided', async () => {
+      const actorId = '507f1f77bcf86cd799439099';
+      const query = createMockQuery({ _id: 'o1', estado: 'confirmado' });
+      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
+
+      await service.updateStatus('o1', 'confirmado', actorId);
+
+      const [, update] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
+      expect(update.$push.historial_estados.actor_id).toBeInstanceOf(Types.ObjectId);
+      expect(update.$push.historial_estados.actor_id.toString()).toBe(actorId);
+    });
+
+    it('should include nota in historial entry when provided', async () => {
+      const query = createMockQuery({ _id: 'o1', estado: 'cancelado' });
+      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
+
+      await service.updateStatus('o1', 'cancelado', undefined, 'Cliente canceló');
+
+      const [, update] = mockOrdenModel.findByIdAndUpdate.mock.calls[0];
+      expect(update.$push.historial_estados.nota).toBe('Cliente canceló');
+    });
+
+    it('should accept all valid estado values including en_proceso', async () => {
+      const validStates = ['pendiente', 'confirmado', 'en_proceso', 'en_camino', 'entregado', 'cancelado'];
 
       for (const estado of validStates) {
+        jest.clearAllMocks();
         const query = createMockQuery({ _id: 'o1', estado });
-        mockModel.findByIdAndUpdate.mockReturnValue(query);
+        mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
 
         const result = await service.updateStatus('o1', estado);
         expect(result).toEqual({ _id: 'o1', estado });
@@ -267,7 +347,7 @@ describe('OrdenesService', () => {
 
     it('should throw NotFoundException when orden to update is not found', async () => {
       const query = createMockQuery(null);
-      mockModel.findByIdAndUpdate.mockReturnValue(query);
+      mockOrdenModel.findByIdAndUpdate.mockReturnValue(query);
 
       await expect(service.updateStatus('nonexistent', 'confirmado')).rejects.toThrow(
         NotFoundException,
@@ -283,17 +363,17 @@ describe('OrdenesService', () => {
   describe('remove', () => {
     it('should delete orden and return { deleted: true }', async () => {
       const query = createMockQuery({ _id: 'o1' });
-      mockModel.findByIdAndDelete.mockReturnValue(query);
+      mockOrdenModel.findByIdAndDelete.mockReturnValue(query);
 
       const result = await service.remove('o1');
 
-      expect(mockModel.findByIdAndDelete).toHaveBeenCalledWith('o1');
+      expect(mockOrdenModel.findByIdAndDelete).toHaveBeenCalledWith('o1');
       expect(result).toEqual({ deleted: true });
     });
 
     it('should throw NotFoundException when orden to delete is not found', async () => {
       const query = createMockQuery(null);
-      mockModel.findByIdAndDelete.mockReturnValue(query);
+      mockOrdenModel.findByIdAndDelete.mockReturnValue(query);
 
       await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
       await expect(service.remove('nonexistent')).rejects.toThrow('Orden no encontrada');
@@ -307,18 +387,18 @@ describe('OrdenesService', () => {
       const ids = ['o1', 'o2', 'o3'];
       const execResult = { deletedCount: 3 };
       const query = createMockQuery(execResult);
-      mockModel.deleteMany.mockReturnValue(query);
+      mockOrdenModel.deleteMany.mockReturnValue(query);
 
       const result = await service.removeMany(ids);
 
-      expect(mockModel.deleteMany).toHaveBeenCalledWith({ _id: { $in: ids } });
+      expect(mockOrdenModel.deleteMany).toHaveBeenCalledWith({ _id: { $in: ids } });
       expect(result).toEqual({ deleted: 3 });
     });
 
     it('should return deleted: 0 when no ordenes matched', async () => {
       const execResult = { deletedCount: 0 };
       const query = createMockQuery(execResult);
-      mockModel.deleteMany.mockReturnValue(query);
+      mockOrdenModel.deleteMany.mockReturnValue(query);
 
       const result = await service.removeMany(['nonexistent']);
 
