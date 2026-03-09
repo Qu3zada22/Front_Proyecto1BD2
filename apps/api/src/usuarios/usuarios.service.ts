@@ -62,10 +62,14 @@ export class UsuariosService {
         return usuario as UsuarioDocument;
     }
 
-    // $push — agregar dirección al array embedded
+    // $push — agregar dirección al array embedded (máximo 10 según diseño)
     async addAddress(id: string, address: any): Promise<UsuarioDocument> {
         const updated = await this.usuarioModel
-            .findByIdAndUpdate(id, { $push: { direcciones: address } }, { new: true })
+            .findByIdAndUpdate(
+                id,
+                { $push: { direcciones: { $each: [address], $slice: -10 } } },
+                { new: true },
+            )
             .select('-password')
             .exec();
         if (!updated) throw new NotFoundException('Usuario no encontrado');

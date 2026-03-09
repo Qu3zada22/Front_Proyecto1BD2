@@ -48,8 +48,14 @@ export class Usuario {
 export const UsuarioSchema = SchemaFactory.createForClass(Usuario);
 
 // ---- Índices ----
-// Simple: búsqueda por email (login)
-UsuarioSchema.index({ email: 1 }, { unique: true, name: 'idx_usuarios_email' });
+// Único: búsqueda por email (login)
+UsuarioSchema.index({ email: 1 }, { unique: true, name: 'email_unique' });
+// Multikey: filtrar por ciudad en array de direcciones embebidas
+UsuarioSchema.index({ 'direcciones.ciudad': 1 }, { name: 'direcciones_ciudad_multikey' });
+// Texto: búsqueda full-text por nombre
+UsuarioSchema.index({ nombre: 'text' }, { name: 'nombre_text' });
+// Simple: filtrar por rol
+UsuarioSchema.index({ rol: 1 }, { name: 'rol_simple' });
 // Compuesto: filtrar usuarios activos por rol
 UsuarioSchema.index({ rol: 1, activo: 1 }, { name: 'idx_usuarios_rol_activo' });
 // Multikey: filtrar/sugerir por preferencias alimentarias ['vegano','sin_gluten',...]

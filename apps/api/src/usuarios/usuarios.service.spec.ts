@@ -301,7 +301,7 @@ describe('UsuariosService', () => {
   // ── addAddress ($push) ───────────────────────────────────────────────────────
 
   describe('addAddress', () => {
-    it('should use $push operator to add address to direcciones array', async () => {
+    it('should use $push with $each and $slice:-10 to enforce max 10 addresses', async () => {
       const newAddress = { alias: 'Casa', calle: '4a Ave', ciudad: 'GT', pais: 'Guatemala' };
       const updated = { _id: 'u1', direcciones: [newAddress] };
       const query = createMockQuery(updated);
@@ -311,7 +311,7 @@ describe('UsuariosService', () => {
 
       expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
         'u1',
-        { $push: { direcciones: newAddress } },
+        { $push: { direcciones: { $each: [newAddress], $slice: -10 } } },
         { new: true },
       );
       expect(query.select).toHaveBeenCalledWith('-password');

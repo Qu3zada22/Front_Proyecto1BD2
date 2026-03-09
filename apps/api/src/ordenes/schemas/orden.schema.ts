@@ -97,14 +97,16 @@ export const OrdenSchema = SchemaFactory.createForClass(Orden);
 // Compuesto ESR: historial de pedidos de un cliente filtrado por estado
 OrdenSchema.index(
     { usuario_id: 1, estado: 1, fecha_creacion: -1 },
-    { name: 'idx_ordenes_usuario_estado_fecha' },
+    { name: 'usuario_estado_fecha_esr' },
 );
 // Compuesto ESR: pedidos de un restaurante por estado
 OrdenSchema.index(
     { restaurante_id: 1, estado: 1, fecha_creacion: -1 },
-    { name: 'idx_ordenes_restaurante_estado_fecha' },
+    { name: 'restaurante_estado_fecha_esr' },
 );
 // Simple: filtro admin global por estado
-OrdenSchema.index({ estado: 1 }, { name: 'idx_ordenes_estado' });
+OrdenSchema.index({ estado: 1 }, { name: 'estado_simple' });
 // Multikey: aggregation platillos más vendidos ($unwind items)
-OrdenSchema.index({ 'items.item_id': 1 }, { name: 'idx_ordenes_items_item_id' });
+OrdenSchema.index({ 'items.item_id': 1 }, { name: 'items_item_id_multikey' });
+// Simple desc: ordenar por fecha de creación
+OrdenSchema.index({ fecha_creacion: -1 }, { name: 'fecha_creacion_desc' });

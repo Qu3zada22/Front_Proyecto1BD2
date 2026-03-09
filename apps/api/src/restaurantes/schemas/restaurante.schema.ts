@@ -68,12 +68,16 @@ export const RestauranteSchema = SchemaFactory.createForClass(Restaurante);
 // ---- Índices ----
 // Compuesto: listar restaurantes activos por nombre
 RestauranteSchema.index({ nombre: 1, activo: 1 }, { name: 'idx_restaurantes_nombre_activo' });
+// Compuesto: restaurantes activos de un propietario
+RestauranteSchema.index({ propietario_id: 1, activo: 1 }, { name: 'propietario_activo_compound' });
 // Geoespacial 2dsphere: búsqueda por proximidad ($near, $geoWithin)
-RestauranteSchema.index({ ubicacion: '2dsphere' }, { name: 'idx_restaurantes_ubicacion_geo' });
+RestauranteSchema.index({ ubicacion: '2dsphere' }, { name: 'ubicacion_2dsphere' });
+// Simple desc: ordenar por calificación
+RestauranteSchema.index({ calificacion_prom: -1 }, { name: 'calificacion_prom_desc' });
 // Texto: búsqueda full-text en nombre y descripción
 RestauranteSchema.index(
     { nombre: 'text', descripcion: 'text' },
-    { name: 'idx_restaurantes_text' },
+    { name: 'nombre_descripcion_text' },
 );
 // Multikey: filtrar por categorías (campo array)
-RestauranteSchema.index({ categorias: 1 }, { name: 'idx_restaurantes_categorias' });
+RestauranteSchema.index({ categorias: 1 }, { name: 'categorias_multikey' });
