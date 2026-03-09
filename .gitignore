@@ -19,3 +19,6 @@ Thumbs.db
 
 # Turbo cache
 .turbo/
+
+# Secretos de producción (generados por el CD workflow)
+.env.prod

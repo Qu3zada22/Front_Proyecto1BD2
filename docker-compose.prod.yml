@@ -1,43 +1,10 @@
 # ============================================================
-# FastPochi — Stack completo para PRODUCCIÓN
+# FastPochi — Stack completo para PRODUCCIÓN (MongoDB Atlas)
 # Uso: docker compose -f docker-compose.prod.yml up -d --build
+# Requiere: .env.prod con MONGODB_URI=mongodb+srv://...
 # ============================================================
 
 services:
-
-  # ── MongoDB ───────────────────────────────────────────────
-  mongo:
-    image: mongo:8.2.5
-    container_name: fastpochi-mongo-prod
-    restart: unless-stopped
-    volumes:
-      - mongo_data_prod:/data/db
-    command: ["--replSet", "rs0", "--bind_ip_all"]
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-    networks:
-      - internal
-
-  mongo-init:
-    image: mongo:8.2.5
-    container_name: fastpochi-mongo-init-prod
-    depends_on:
-      mongo:
-        condition: service_healthy
-    restart: "no"
-    command: >
-      mongosh --host mongo:27017 --quiet --eval
-      "try { rs.status(); print('replica set ya inicializado') }
-       catch(e) {
-         rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] });
-         print('replica set inicializado OK')
-       }"
-    networks:
-      - internal
 
   # ── API NestJS ────────────────────────────────────────────
   api:
@@ -46,14 +13,11 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: fastpochi-api-prod
     restart: unless-stopped
+    env_file:
+      - .env.prod
     environment:
       NODE_ENV: production
       PORT: 3000
-      # Desde dentro de Docker, replicaSet=rs0 funciona porque "mongo" es resoluble
-      MONGODB_URI: mongodb://mongo:27017/fastpochi?replicaSet=rs0
-    depends_on:
-      mongo-init:
-        condition: service_completed_successfully
     networks:
       - internal
     # No exponer 3000 al exterior — nginx es el único punto de entrada
@@ -77,7 +41,3 @@ services:
 networks:
   internal:
     driver: bridge
-
-volumes:
-  mongo_data_prod:
-    driver: local
