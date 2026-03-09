@@ -116,6 +116,8 @@ async function createReviewIndexes(db) {
     col.createIndex({ orden_id: 1 }, { name: 'orden_id_simple' }),
     // Multikey sobre likes (array de ObjectIds, $addToSet/$pull)
     col.createIndex({ likes: 1 }, { name: 'idx_resenas_likes' }),
+    // Simple: filtrar reseñas activas/inactivas (soft-delete, evita COLLSCAN con notablescan)
+    col.createIndex({ activa: 1 }, { name: 'idx_resenas_activa' }),
   ])
   console.log('  [OK] resenas indexes')
 }

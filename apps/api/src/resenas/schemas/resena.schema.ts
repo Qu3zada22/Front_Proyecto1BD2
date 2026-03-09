@@ -57,3 +57,5 @@ ResenaSchema.index(
 );
 // Multikey: filtrar reseñas por usuario que dio like ($addToSet / $pull)
 ResenaSchema.index({ likes: 1 }, { name: 'idx_resenas_likes' });
+// Simple: filtrar reseñas activas/inactivas (soft-delete, evita COLLSCAN con notablescan)
+ResenaSchema.index({ activa: 1 }, { name: 'idx_resenas_activa' });

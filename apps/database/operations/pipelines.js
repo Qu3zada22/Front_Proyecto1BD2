@@ -60,7 +60,7 @@ export async function topMenuItems(db, limit = 10) {
         _id: '$items.item_id',
         item: { $first: '$items.nombre' },
         veces_ordenado: { $sum: '$items.cantidad' },
-        precio: { $first: '$items.precio' },
+        precio: { $first: { $ifNull: ['$items.precio', '$items.precio_unitario'] } },
         restaurante_id: { $first: '$restaurante_id' },
       },
     },

@@ -139,7 +139,9 @@ async function main() {
 
   section('PIPELINE P1 — Revenue por restaurante (entregadas)')
   for (const r of await P.revenueByRestaurant(db)) {
-    console.log(`  ${r.restaurante.padEnd(28)} Q${String(r.total_revenue.toFixed(2)).padStart(10)}  ticket_prom: Q${r.ticket_prom.toFixed(2)}  (${r.num_ordenes} órdenes)`)
+    const rev = parseFloat(r.total_revenue.toString());
+    const tick = parseFloat(r.ticket_prom.toString());
+    console.log(`  ${r.restaurante.padEnd(28)} Q${String(rev.toFixed(2)).padStart(10)}  ticket_prom: Q${tick.toFixed(2)}  (${r.num_ordenes} órdenes)`)
   }
 
   section('PIPELINE P2 — Top 10 menu items más ordenados')
@@ -161,7 +163,8 @@ async function main() {
 
   section('PIPELINE P5 — Top 5 clientes más activos')
   for (const r of await P.clientesMasActivos(db, 5)) {
-    console.log(`  ${r.cliente.padEnd(28)} ${r.total_ordenes} órdenes  Q${r.total_gastado.toFixed(2)} gastado`)
+    const gastado = parseFloat(r.total_gastado.toString());
+    console.log(`  ${r.cliente.padEnd(28)} ${r.total_ordenes} órdenes  Q${gastado.toFixed(2)} gastado`)
   }
 
   section('PIPELINE P6 — Top 5 reseñas con más likes')
@@ -172,12 +175,12 @@ async function main() {
   section('PIPELINE P7 — Estados de órdenes por restaurante')
   for (const r of await P.estadosOrdenesporRestaurante(db)) {
     const resumen = r.estados.map((e) => `${e.estado}:${e.total}`).join('  ')
-    console.log(`  ${r.restaurante.padEnd(28)} total:${r.total_ordenes}  [${resumen}]`)
+    console.log(`  ${(r.restaurante ?? '(sin restaurante)').padEnd(28)} total:${r.total_ordenes}  [${resumen}]`)
   }
 
   section('PIPELINE P8 — Items veganos disponibles por restaurante')
   for (const r of await P.itemsVeganosPorRestaurante(db)) {
-    console.log(`  ${r.restaurante.padEnd(28)} ${r.total_items_veganos} items veganos`)
+    console.log(`  ${(r.restaurante ?? '(sin restaurante)').padEnd(28)} ${r.total_items_veganos} items veganos`)
     r.items.forEach((i) => console.log(`      • ${i.nombre} (${i.categoria}) Q${i.precio}`))
   }
 
