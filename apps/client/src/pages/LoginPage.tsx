@@ -10,7 +10,7 @@ type DemoUser = { label: string; email: string; rol: string }
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { login, user } = useAuth()
+  const { login } = useAuth()
   const [email, setEmail] = useState("")
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -91,7 +91,7 @@ export default function LoginPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(null) }}
+                onChange={(e) => { setEmail(e.target.value); setError(false) }}
                 placeholder="correo@ejemplo.com"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 disabled={loading}

@@ -8,7 +8,6 @@ import type {
   Resena,
   EstadoOrden,
 } from "./mock-data"
-import { loginByEmail, type UsuarioAPI } from "@/services/usuarios"
 
 // ============================================================
 // Auth Context
