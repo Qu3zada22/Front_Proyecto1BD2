@@ -1,0 +1,28 @@
+{
+    "name": "proyecto1-bd2",
+    "version": "1.0.0",
+    "main": "index.js",
+    "scripts": {
+        "dev": "turbo dev",
+        "build": "turbo build",
+        "test": "turbo test",
+        "test:cov": "turbo test:cov",
+        "lint": "turbo lint",
+        "clean": "turbo clean && find apps -maxdepth 2 -name dist -type d -exec rm -rf {} + 2>/dev/null; true"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "packageManager": "npm@10.9.2",
+    "workspaces": [
+        "apps/*"
+    ],
+    "devDependencies": {
+        "turbo": "^2.8.14"
+    },
+    "dependencies": {
+        "class-transformer": "^0.5.1",
+        "class-validator": "^0.15.1"
+    }
+}

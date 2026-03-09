@@ -1,0 +1,42 @@
+# Dependencias — se instalan dentro del contenedor
+node_modules
+apps/*/node_modules
+apps/database/node_modules
+
+# Builds anteriores
+dist
+apps/*/dist
+apps/client/dist
+
+# Git
+.git
+.gitignore
+
+# Entornos locales
+.env
+apps/**/.env
+*.local
+
+# Tests y cobertura
+coverage
+apps/*/coverage
+
+# Turborepo cache
+.turbo
+
+# Editor
+.vscode
+.idea
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Documentos no necesarios en la imagen
+docs/
+README.md
