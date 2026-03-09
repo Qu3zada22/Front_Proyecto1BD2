@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import { Orden, OrdenDocument, EstadoOrden } from './schemas/orden.schema';
+import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
 import { CreateOrdenDto } from './dto/create-orden.dto';
 
 const ESTADOS_VALIDOS: EstadoOrden[] = [
@@ -12,16 +13,30 @@ const ESTADOS_VALIDOS: EstadoOrden[] = [
 export class OrdenesService {
     constructor(
         @InjectModel(Orden.name) private ordenModel: Model<OrdenDocument>,
+        @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
         @InjectConnection() private connection: Connection,
     ) { }
 
-    // Transacción MongoDB — requiere replica set
+    // Transacción ACID: insert orden + bulkWrite $inc veces_ordenado
     async create(dto: CreateOrdenDto): Promise<OrdenDocument> {
         const total = dto.items.reduce((sum, i) => sum + i.precio * i.cantidad, 0);
         const session = await this.connection.startSession();
         session.startTransaction();
         try {
-            const [orden] = await this.ordenModel.create([{ ...dto, total }] as any[], { session });
+            const [orden] = await this.ordenModel.create(
+                [{ ...dto, total }] as any[],
+                { session },
+            );
+
+            // bulkWrite: $inc veces_ordenado en cada menu_item de la orden
+            const bulkOps = dto.items.map((item) => ({
+                updateOne: {
+                    filter: { _id: new Types.ObjectId(item.menu_item_id) },
+                    update: { $inc: { veces_ordenado: item.cantidad } },
+                },
+            }));
+            await this.menuItemModel.bulkWrite(bulkOps as any[], { session } as any);
+
             await session.commitTransaction();
             return orden;
         } catch (err) {
@@ -48,7 +63,7 @@ export class OrdenesService {
             .find(filter)
             .populate('usuario_id', 'nombre email')
             .populate('restaurante_id', 'nombre direccion')
-            .sort({ createdAt: -1 })
+            .sort({ fecha_creacion: -1 })
             .skip(query.skip ?? 0)
             .limit(query.limit ?? 20)
             .lean()
@@ -66,12 +81,35 @@ export class OrdenesService {
         return orden;
     }
 
-    async updateStatus(id: string, estado: string): Promise<OrdenDocument> {
+    // $set estado + $push historial_estados (array embebido)
+    async updateStatus(
+        id: string,
+        estado: string,
+        actorId?: string,
+        nota?: string,
+    ): Promise<OrdenDocument> {
         if (!ESTADOS_VALIDOS.includes(estado as EstadoOrden)) {
             throw new BadRequestException(`Estado inválido. Válidos: ${ESTADOS_VALIDOS.join(', ')}`);
         }
+
+        const histEntry: any = {
+            estado,
+            timestamp: new Date(),
+            ...(actorId && { actor_id: new Types.ObjectId(actorId) }),
+            ...(nota && { nota }),
+        };
+
+        const update: any = {
+            $set: { estado },
+            $push: { historial_estados: histEntry },
+        };
+
+        if (estado === 'entregado') {
+            update.$set.fecha_entrega_real = new Date();
+        }
+
         const updated = await this.ordenModel
-            .findByIdAndUpdate(id, { $set: { estado } }, { new: true })
+            .findByIdAndUpdate(id, update, { new: true })
             .exec();
         if (!updated) throw new NotFoundException('Orden no encontrada');
         return updated;

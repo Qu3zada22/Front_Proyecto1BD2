@@ -11,19 +11,37 @@ export type EstadoOrden =
 // ---- Embedded: snapshot del ítem al momento de la orden ----
 @Schema({ _id: false })
 export class ItemOrden {
-    @Prop({ type: Types.ObjectId, ref: 'MenuItem', required: true })
-    menu_item_id: Types.ObjectId;
+    @Prop({ type: Types.ObjectId, ref: 'MenuItem' })
+    menu_item_id?: Types.ObjectId;
+
+    // item_id: alias usado por el seed (compatibilidad)
+    @Prop({ type: Types.ObjectId, ref: 'MenuItem' })
+    item_id?: Types.ObjectId;
 
     @Prop({ required: true }) nombre: string;    // snapshot
-    @Prop({ required: true }) precio: number;    // snapshot del precio
+    @Prop() precio?: number;                      // campo API
+    @Prop() precio_unitario?: number;             // campo seed (Decimal128 convertido)
     @Prop({ required: true, min: 1 }) cantidad: number;
+    @Prop() subtotal?: number;                    // precio_unitario × cantidad
     @Prop() notas?: string;
+    @Prop() notas_item?: string;                  // alias seed
 }
 export const ItemOrdenSchema = SchemaFactory.createForClass(ItemOrden);
+
+// ---- Embedded: entrada del historial de estados ----
+@Schema({ _id: false })
+export class EstadoLog {
+    @Prop({ required: true }) estado: string;
+    @Prop({ required: true, default: () => new Date() }) timestamp: Date;
+    @Prop({ type: Types.ObjectId }) actor_id?: Types.ObjectId;
+    @Prop() nota?: string;
+}
+export const EstadoLogSchema = SchemaFactory.createForClass(EstadoLog);
 
 // ---- Embedded: dirección de entrega (snapshot) ----
 @Schema({ _id: false })
 export class DireccionEntrega {
+    @Prop() alias?: string;
     @Prop({ required: true }) calle: string;
     @Prop({ required: true }) ciudad: string;
     @Prop({ required: true }) pais: string;
@@ -52,24 +70,41 @@ export class Orden {
     })
     estado: EstadoOrden;
 
+    // Historial de cambios de estado — $push al cambiar estado
+    @Prop({ type: [EstadoLogSchema], default: [] })
+    historial_estados: EstadoLog[];
+
     @Prop({ required: true, min: 0 }) total: number;
 
     @Prop({ type: DireccionEntregaSchema, required: true })
     direccion_entrega: DireccionEntrega;
 
     @Prop() notas?: string;
+
+    // DESNORM: evita $lookup a resenas para saber si la orden fue reseñada
+    @Prop({ default: false }) tiene_resena: boolean;
+
+    // Fecha explícita para queries y aggregations (Mongoose timestamps da createdAt)
+    @Prop({ default: () => new Date() }) fecha_creacion: Date;
+
+    // Seteada cuando estado pasa a 'entregado'
+    @Prop() fecha_entrega_real?: Date;
 }
 
 export const OrdenSchema = SchemaFactory.createForClass(Orden);
 
 // ---- Índices ----
-// Compuesto: historial de pedidos de un cliente filtrado por estado
+// Compuesto ESR: historial de pedidos de un cliente filtrado por estado
 OrdenSchema.index(
-    { usuario_id: 1, estado: 1, createdAt: -1 },
+    { usuario_id: 1, estado: 1, fecha_creacion: -1 },
     { name: 'idx_ordenes_usuario_estado_fecha' },
 );
-// Compuesto: pedidos de un restaurante por estado
+// Compuesto ESR: pedidos de un restaurante por estado
 OrdenSchema.index(
-    { restaurante_id: 1, estado: 1, createdAt: -1 },
+    { restaurante_id: 1, estado: 1, fecha_creacion: -1 },
     { name: 'idx_ordenes_restaurante_estado_fecha' },
 );
+// Simple: filtro admin global por estado
+OrdenSchema.index({ estado: 1 }, { name: 'idx_ordenes_estado' });
+// Multikey: aggregation platillos más vendidos ($unwind items)
+OrdenSchema.index({ 'items.item_id': 1 }, { name: 'idx_ordenes_items_item_id' });

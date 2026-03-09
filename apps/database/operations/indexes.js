@@ -88,8 +88,8 @@ async function createReviewIndexes(db) {
   await Promise.all([
     // Compuesto: restaurante_id + calificacion desc
     col.createIndex({ restaurante_id: 1, calificacion: -1 }, { name: 'restaurante_calificacion' }),
-    // Simple sobre usuario_id
-    col.createIndex({ usuario_id: 1 }, { name: 'usuario_id_simple' }),
+    // Simple sobre cliente_id (FK al usuario que escribió la reseña)
+    col.createIndex({ cliente_id: 1 }, { name: 'cliente_id_simple' }),
     // Simple descendente sobre fecha
     col.createIndex({ fecha: -1 }, { name: 'fecha_desc' }),
     // Multikey sobre tags
