@@ -3,9 +3,12 @@
     "version": "1.0.0",
     "main": "index.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
         "dev": "turbo dev",
-        "build": "turbo build"
+        "build": "turbo build",
+        "test": "turbo test",
+        "test:cov": "turbo test:cov",
+        "lint": "turbo lint",
+        "clean": "turbo clean && find apps -maxdepth 2 -name dist -type d -exec rm -rf {} + 2>/dev/null; true"
     },
     "keywords": [],
     "author": "",
