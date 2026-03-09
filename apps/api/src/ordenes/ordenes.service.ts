@@ -35,6 +35,15 @@ export class OrdenesService {
         const session = await this.connection.startSession();
         session.startTransaction();
         try {
+            // Paso 1 (PDF spec): verificar disponible:true en todos los platillos
+            const itemIds = itemsMapped.map(i => i.item_id);
+            const disponibles = await this.menuItemModel
+                .find({ _id: { $in: itemIds }, disponible: true }, { _id: 1 }, { session })
+                .lean();
+            if (disponibles.length !== itemIds.length) {
+                throw new BadRequestException('Uno o más platillos no están disponibles');
+            }
+
             const [orden] = await this.ordenModel.create(
                 [{ ...dto, items: itemsMapped, total }] as any[],
                 { session },
@@ -53,6 +62,7 @@ export class OrdenesService {
             return orden;
         } catch (err) {
             await session.abortTransaction();
+            if (err instanceof BadRequestException) throw err;
             throw new BadRequestException('Error al crear la orden: ' + (err as Error).message);
         } finally {
             await session.endSession();
