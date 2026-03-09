@@ -42,11 +42,6 @@ ResenaSchema.index(
     { restaurante_id: 1, calificacion: -1 },
     { name: 'idx_resenas_restaurante_calificacion' },
 );
-// Compuesto único: evitar reseñas duplicadas del mismo usuario al mismo restaurante
-ResenaSchema.index(
-    { usuario_id: 1, restaurante_id: 1 },
-    { unique: true, sparse: true, name: 'idx_resenas_usuario_restaurante_unique' },
-);
 // Simple: reseñas de un usuario
 ResenaSchema.index({ usuario_id: 1 }, { name: 'idx_resenas_usuario' });
 // Simple: reseñas por orden

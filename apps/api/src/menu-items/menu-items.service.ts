@@ -66,7 +66,7 @@ export class MenuItemsService {
 
     async removeByRestaurant(restauranteId: string): Promise<{ deleted: number }> {
         const result = await this.menuItemModel
-            .deleteMany({ restaurante_id: restauranteId })
+            .deleteMany({ restaurante_id: new Types.ObjectId(restauranteId) })
             .exec();
         return { deleted: result.deletedCount };
     }

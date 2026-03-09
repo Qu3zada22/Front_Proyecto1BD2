@@ -73,7 +73,7 @@ RestauranteSchema.index({ ubicacion: '2dsphere' }, { name: 'idx_restaurantes_ubi
 // Texto: búsqueda full-text en nombre y descripción
 RestauranteSchema.index(
     { nombre: 'text', descripcion: 'text' },
-    { name: 'idx_restaurantes_text', weights: { nombre: 10, descripcion: 5 } },
+    { name: 'idx_restaurantes_text' },
 );
 // Multikey: filtrar por categorías (campo array)
 RestauranteSchema.index({ categorias: 1 }, { name: 'idx_restaurantes_categorias' });

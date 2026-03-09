@@ -23,7 +23,7 @@ export class OrdenesController {
     @ApiOperation({ summary: 'Listar pedidos', description: 'Filtra por cliente, restaurante o estado. Usa índice compuesto.' })
     @ApiQuery({ name: 'cliente_id', required: false, description: 'ObjectId del cliente' })
     @ApiQuery({ name: 'restaurante_id', required: false, description: 'ObjectId del restaurante' })
-    @ApiQuery({ name: 'estado', required: false, enum: ['pendiente', 'confirmado', 'en_camino', 'entregado', 'cancelado'] })
+    @ApiQuery({ name: 'estado', required: false, enum: ['pendiente', 'confirmado', 'en_proceso', 'en_camino', 'entregado', 'cancelado'] })
     @ApiQuery({ name: 'skip', required: false, type: Number })
     @ApiQuery({ name: 'limit', required: false, type: Number })
     findAll(

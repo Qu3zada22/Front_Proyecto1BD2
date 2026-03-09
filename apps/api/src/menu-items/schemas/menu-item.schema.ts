@@ -5,7 +5,7 @@ export type MenuItemDocument = HydratedDocument<MenuItem>;
 
 export type CategoriaMenu = 'entrada' | 'principal' | 'postre' | 'bebida' | 'extra';
 
-@Schema({ timestamps: true, collection: 'menu_items' })
+@Schema({ timestamps: false, collection: 'menu_items' })
 export class MenuItem {
     @Prop({ type: Types.ObjectId, ref: 'Restaurante', required: true })
     restaurante_id: Types.ObjectId;
@@ -34,6 +34,7 @@ export class MenuItem {
 
     @Prop({ default: 0 }) veces_ordenado: number;
     @Prop({ default: 0 }) orden_display: number;
+    @Prop({ default: () => new Date() }) fecha_creacion: Date;
 }
 
 export const MenuItemSchema = SchemaFactory.createForClass(MenuItem);
