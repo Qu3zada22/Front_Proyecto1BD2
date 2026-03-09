@@ -36,11 +36,13 @@ export class OrdenesService {
         session.startTransaction();
         try {
             // Paso 1 (PDF spec): verificar disponible:true en todos los platillos
-            const itemIds = itemsMapped.map(i => i.item_id);
+            // Deduplicar IDs: $in deduplica en MongoDB, el length debe compararse contra únicos
+            const uniqueItemIds = [...new Set(itemsMapped.map(i => i.item_id.toHexString()))]
+                .map(hex => new Types.ObjectId(hex));
             const disponibles = await this.menuItemModel
-                .find({ _id: { $in: itemIds }, disponible: true }, { _id: 1 }, { session })
+                .find({ _id: { $in: uniqueItemIds }, disponible: true }, { _id: 1 }, { session })
                 .lean();
-            if (disponibles.length !== itemIds.length) {
+            if (disponibles.length !== uniqueItemIds.length) {
                 throw new BadRequestException('Uno o más platillos no están disponibles');
             }
 

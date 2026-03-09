@@ -181,6 +181,26 @@ describe('OrdenesService', () => {
       expect(mockSession.abortTransaction).toHaveBeenCalled();
     });
 
+    it('should NOT throw when the same menu_item_id appears twice in the order (deduplication)', async () => {
+      const duplicateItemDto = {
+        ...baseDto,
+        items: [
+          { menu_item_id: '507f1f77bcf86cd799439031', nombre: 'Burger', precio: 45, cantidad: 2 },
+          { menu_item_id: '507f1f77bcf86cd799439031', nombre: 'Burger', precio: 45, cantidad: 1 },
+        ],
+      };
+      // find returns 1 unique item (deduped) — check should pass (1 === 1)
+      mockMenuItemModel.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue([{ _id: '507f1f77bcf86cd799439031' }]),
+      });
+      mockOrdenModel.create.mockResolvedValue([{ _id: 'orden1', total: 135 }]);
+      mockMenuItemModel.bulkWrite.mockResolvedValue({});
+
+      await expect(service.create(duplicateItemDto as any)).resolves.toBeDefined();
+      expect(mockSession.abortTransaction).not.toHaveBeenCalled();
+      expect(mockSession.commitTransaction).toHaveBeenCalled();
+    });
+
     it('should abort transaction and throw BadRequestException on error', async () => {
       mockOrdenModel.create.mockRejectedValue(new Error('DB error'));
 
