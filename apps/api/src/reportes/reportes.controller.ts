@@ -39,14 +39,14 @@ export class ReportesController {
     @ApiOperation({ summary: 'Top restaurantes', description: 'Aggregation compleja: parte de resenas (fuente de verdad) → $group avg/count → $match(≥5 reseñas) → $sort/$limit → $lookup restaurantes → $project.' })
     @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
     topRestaurantes(@Query('limit') limit: string) {
-        return this.reportesService.topRestaurantes(+limit || 10);
+        return this.reportesService.topRestaurantes(Math.max(1, +limit || 10));
     }
 
     @Get('menu-items/best-sellers')
     @ApiOperation({ summary: 'Platillos más vendidos', description: 'Aggregation: $unwind items + $group por item_id + $sort por cantidad.' })
     @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
     platillosMasVendidos(@Query('limit') limit: string) {
-        return this.reportesService.platillosMasVendidos(+limit || 10);
+        return this.reportesService.platillosMasVendidos(Math.max(1, +limit || 10));
     }
 
     @Get('revenue/by-day')
@@ -84,6 +84,6 @@ export class ReportesController {
     })
     @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
     usuariosConMayorGasto(@Query('limit') limit: string) {
-        return this.reportesService.usuariosConMayorGasto(+limit || 10);
+        return this.reportesService.usuariosConMayorGasto(Math.max(1, +limit || 10));
     }
 }

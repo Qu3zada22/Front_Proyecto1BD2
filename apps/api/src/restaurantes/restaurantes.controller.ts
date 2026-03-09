@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { RestaurantesService } from './restaurantes.service';
 import { CreateRestauranteDto } from './dto/create-restaurante.dto';
@@ -38,7 +38,11 @@ export class RestaurantesController {
         @Query('lat') lat: string,
         @Query('maxDistance') maxDistance: string,
     ) {
-        return this.restaurantesService.findNear(+lng, +lat, +maxDistance || 5000);
+        const lngNum = +lng, latNum = +lat;
+        if (isNaN(lngNum) || isNaN(latNum)) {
+            throw new BadRequestException('lng y lat son requeridos y deben ser números válidos');
+        }
+        return this.restaurantesService.findNear(lngNum, latNum, +maxDistance || 5000);
     }
 
     @Get(':id')

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { ResenasService } from './resenas.service';
 import { Resena } from './schemas/resena.schema';
@@ -48,10 +48,12 @@ const mockResenaModel = {
 
 const mockRestauranteModel = {
   findByIdAndUpdate: jest.fn().mockResolvedValue({}),
+  countDocuments: jest.fn(),
 };
 
 const mockOrdenModel = {
   findByIdAndUpdate: jest.fn().mockResolvedValue({}),
+  countDocuments: jest.fn(),
 };
 
 // ── suite ─────────────────────────────────────────────────────────────────────
@@ -64,6 +66,8 @@ describe('ResenasService', () => {
     mockConnection.startSession.mockResolvedValue(mockSession);
     mockRestauranteModel.findByIdAndUpdate.mockResolvedValue({});
     mockOrdenModel.findByIdAndUpdate.mockResolvedValue({});
+    mockRestauranteModel.countDocuments.mockResolvedValue(1);
+    mockOrdenModel.countDocuments.mockResolvedValue(1);
     mockAggregateChain.session.mockResolvedValue([{ avg: 4.5, count: 10 }]);
     mockResenaModel.aggregate.mockReturnValue(mockAggregateChain);
 
@@ -171,6 +175,24 @@ describe('ResenasService', () => {
       try { await service.create({ usuario_id: 'u1' }); } catch { /* expected */ }
 
       expect(mockSession.endSession).toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when restaurante_id does not exist', async () => {
+      mockRestauranteModel.countDocuments.mockResolvedValue(0);
+      const data = { usuario_id: 'u1', restaurante_id: new Types.ObjectId().toString(), calificacion: 5 };
+
+      await expect(service.create(data)).rejects.toThrow(BadRequestException);
+      await expect(service.create(data)).rejects.toThrow('El restaurante referenciado no existe');
+      expect(mockResenaModel.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when orden_id does not exist', async () => {
+      mockOrdenModel.countDocuments.mockResolvedValue(0);
+      const data = { usuario_id: 'u1', restaurante_id: new Types.ObjectId().toString(), orden_id: new Types.ObjectId().toString(), calificacion: 5 };
+
+      await expect(service.create(data)).rejects.toThrow(BadRequestException);
+      await expect(service.create(data)).rejects.toThrow('La orden referenciada no existe');
+      expect(mockResenaModel.create).not.toHaveBeenCalled();
     });
   });
 

@@ -4,6 +4,7 @@ import { Connection, Model } from 'mongoose';
 import { Restaurante, RestauranteDocument } from './schemas/restaurante.schema';
 import { MenuItem } from '../menu-items/schemas/menu-item.schema';
 import { Orden } from '../ordenes/schemas/orden.schema';
+import { Usuario } from '../usuarios/schemas/usuario.schema';
 
 @Injectable()
 export class RestaurantesService {
@@ -11,10 +12,15 @@ export class RestaurantesService {
         @InjectModel(Restaurante.name) private restauranteModel: Model<RestauranteDocument>,
         @InjectModel(MenuItem.name) private menuItemModel: Model<any>,
         @InjectModel(Orden.name) private ordenModel: Model<any>,
+        @InjectModel(Usuario.name) private usuarioModel: Model<any>,
         @InjectConnection() private connection: Connection,
     ) { }
 
     async create(data: any): Promise<RestauranteDocument> {
+        if (data.propietario_id) {
+            const ownerExists = await this.usuarioModel.countDocuments({ _id: data.propietario_id });
+            if (!ownerExists) throw new BadRequestException('El propietario referenciado no existe');
+        }
         return this.restauranteModel.create(data);
     }
 

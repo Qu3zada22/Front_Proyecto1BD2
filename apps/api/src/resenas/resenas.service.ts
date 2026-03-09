@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import { Resena, ResenaDocument } from './schemas/resena.schema';
@@ -16,6 +16,17 @@ export class ResenasService {
 
     // Transacción ACID: insert reseña + actualizar campos desnormalizados
     async create(data: any): Promise<ResenaDocument> {
+        // Validar FK: restaurante_id debe existir si se proporciona
+        if (data.restaurante_id) {
+            const restExists = await this.restauranteModel.countDocuments({ _id: data.restaurante_id });
+            if (!restExists) throw new BadRequestException('El restaurante referenciado no existe');
+        }
+        // Validar FK: orden_id debe existir si se proporciona
+        if (data.orden_id) {
+            const ordenExists = await this.ordenModel.countDocuments({ _id: data.orden_id });
+            if (!ordenExists) throw new BadRequestException('La orden referenciada no existe');
+        }
+
         const session = await this.connection.startSession();
         session.startTransaction();
         try {

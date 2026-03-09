@@ -1,15 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { MenuItem, MenuItemDocument } from './schemas/menu-item.schema';
+import { Restaurante } from '../restaurantes/schemas/restaurante.schema';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
 
 @Injectable()
 export class MenuItemsService {
-    constructor(@InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>) { }
+    constructor(
+        @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
+        @InjectModel(Restaurante.name) private restauranteModel: Model<any>,
+    ) { }
 
     async create(dto: CreateMenuItemDto): Promise<MenuItemDocument> {
+        const restExists = await this.restauranteModel.countDocuments({ _id: dto.restaurante_id });
+        if (!restExists) throw new BadRequestException('El restaurante referenciado no existe');
         return this.menuItemModel.create(dto);
     }
 

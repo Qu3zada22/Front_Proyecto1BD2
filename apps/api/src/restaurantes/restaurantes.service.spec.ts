@@ -5,6 +5,7 @@ import { RestaurantesService } from './restaurantes.service';
 import { Restaurante } from './schemas/restaurante.schema';
 import { MenuItem } from '../menu-items/schemas/menu-item.schema';
 import { Orden } from '../ordenes/schemas/orden.schema';
+import { Usuario } from '../usuarios/schemas/usuario.schema';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,10 @@ const mockOrdenModel = {
   countDocuments: jest.fn(),
 };
 
+const mockUsuarioModel = {
+  countDocuments: jest.fn(),
+};
+
 // ── suite ─────────────────────────────────────────────────────────────────────
 
 describe('RestaurantesService', () => {
@@ -65,6 +70,7 @@ describe('RestaurantesService', () => {
     mockConnection.startSession.mockResolvedValue(mockSession);
     mockMenuItemModel.updateMany.mockResolvedValue({ modifiedCount: 5 });
     mockOrdenModel.updateMany.mockResolvedValue({ modifiedCount: 3 });
+    mockUsuarioModel.countDocuments.mockResolvedValue(1);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -72,6 +78,7 @@ describe('RestaurantesService', () => {
         { provide: getModelToken(Restaurante.name), useValue: mockModel },
         { provide: getModelToken(MenuItem.name), useValue: mockMenuItemModel },
         { provide: getModelToken(Orden.name), useValue: mockOrdenModel },
+        { provide: getModelToken(Usuario.name), useValue: mockUsuarioModel },
         { provide: getConnectionToken(), useValue: mockConnection },
       ],
     }).compile();
@@ -83,14 +90,24 @@ describe('RestaurantesService', () => {
 
   describe('create', () => {
     it('should call model.create with the provided data and return result', async () => {
-      const data = { nombre: 'Pizza Palace', categorias: ['italiana'] };
+      const data = { nombre: 'Pizza Palace', categorias: ['italiana'], propietario_id: 'owner1' };
       const created = { _id: 'abc123', ...data };
       mockModel.create.mockResolvedValue(created);
 
       const result = await service.create(data);
 
+      expect(mockUsuarioModel.countDocuments).toHaveBeenCalledWith({ _id: 'owner1' });
       expect(mockModel.create).toHaveBeenCalledWith(data);
       expect(result).toEqual(created);
+    });
+
+    it('should throw BadRequestException when propietario_id does not exist', async () => {
+      mockUsuarioModel.countDocuments.mockResolvedValue(0);
+      const data = { nombre: 'Pizza Palace', propietario_id: 'nonexistent' };
+
+      await expect(service.create(data)).rejects.toThrow(BadRequestException);
+      await expect(service.create(data)).rejects.toThrow('El propietario referenciado no existe');
+      expect(mockModel.create).not.toHaveBeenCalled();
     });
   });
 
