@@ -25,18 +25,19 @@ export default function ClientePedidoTracking() {
   const [comentario, setComentario] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [ordenApi, setOrdenApi] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [fetchDone, setFetchDone] = useState(false)
 
   const ordenFromStore = ordenes.find((o) => o._id === id)
 
   useEffect(() => {
-    if (ordenFromStore) { setLoading(false); return }
-    if (!id) return
+    if (ordenFromStore || !id) return
     api.getOrder(id)
       .then((data) => setOrdenApi(data))
       .catch(() => {})
-      .finally(() => setLoading(false))
+      .finally(() => setFetchDone(true))
   }, [id, ordenFromStore])
+
+  const loading = !ordenFromStore && !ordenApi && !fetchDone
 
   const orden = ordenFromStore ?? ordenApi
   const restaurante = restaurantes.find((r) => r._id === orden?.restaurante_id)
