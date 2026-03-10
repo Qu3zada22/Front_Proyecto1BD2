@@ -90,13 +90,19 @@ describe('RestaurantesService', () => {
 
   describe('create', () => {
     it('should call model.create with the provided data and return result', async () => {
-      const data = { nombre: 'Pizza Palace', categorias: ['italiana'], propietario_id: 'owner1' };
+      const data = {
+        nombre: 'Pizza Palace',
+        categorias: ['italiana'],
+        propietario_id: 'owner1',
+      };
       const created = { _id: 'abc123', ...data };
       mockModel.create.mockResolvedValue(created);
 
       const result = await service.create(data);
 
-      expect(mockUsuarioModel.countDocuments).toHaveBeenCalledWith({ _id: 'owner1' });
+      expect(mockUsuarioModel.countDocuments).toHaveBeenCalledWith({
+        _id: 'owner1',
+      });
       expect(mockModel.create).toHaveBeenCalledWith(data);
       expect(result).toEqual(created);
     });
@@ -106,7 +112,9 @@ describe('RestaurantesService', () => {
       const data = { nombre: 'Pizza Palace', propietario_id: 'nonexistent' };
 
       await expect(service.create(data)).rejects.toThrow(BadRequestException);
-      await expect(service.create(data)).rejects.toThrow('El propietario referenciado no existe');
+      await expect(service.create(data)).rejects.toThrow(
+        'El propietario referenciado no existe',
+      );
       expect(mockModel.create).not.toHaveBeenCalled();
     });
   });
@@ -239,8 +247,12 @@ describe('RestaurantesService', () => {
       const query = createMockQuery(null);
       mockModel.findById.mockReturnValue(query);
 
-      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
-      await expect(service.findOne('nonexistent')).rejects.toThrow('Restaurante no encontrado');
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        'Restaurante no encontrado',
+      );
     });
   });
 
@@ -252,7 +264,9 @@ describe('RestaurantesService', () => {
       const query = createMockQuery(updated);
       mockModel.findByIdAndUpdate.mockReturnValue(query);
 
-      const result = await service.update('abc', { nombre: 'Pizza Palace Updated' });
+      const result = await service.update('abc', {
+        nombre: 'Pizza Palace Updated',
+      });
 
       expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
         'abc',
@@ -266,8 +280,12 @@ describe('RestaurantesService', () => {
       const query = createMockQuery(null);
       mockModel.findByIdAndUpdate.mockReturnValue(query);
 
-      await expect(service.update('nonexistent', {})).rejects.toThrow(NotFoundException);
-      await expect(service.update('nonexistent', {})).rejects.toThrow('Restaurante no encontrado');
+      await expect(service.update('nonexistent', {})).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.update('nonexistent', {})).rejects.toThrow(
+        'Restaurante no encontrado',
+      );
     });
   });
 
@@ -282,8 +300,12 @@ describe('RestaurantesService', () => {
 
       const result = await service.remove('abc');
 
-      expect(mockOrdenModel.countDocuments).toHaveBeenCalledWith({ restaurante_id: 'abc' });
-      expect(mockMenuItemModel.countDocuments).toHaveBeenCalledWith({ restaurante_id: 'abc' });
+      expect(mockOrdenModel.countDocuments).toHaveBeenCalledWith({
+        restaurante_id: 'abc',
+      });
+      expect(mockMenuItemModel.countDocuments).toHaveBeenCalledWith({
+        restaurante_id: 'abc',
+      });
       expect(mockModel.findByIdAndDelete).toHaveBeenCalledWith('abc');
       expect(result).toEqual({ deleted: true });
     });
@@ -293,7 +315,9 @@ describe('RestaurantesService', () => {
       mockMenuItemModel.countDocuments.mockResolvedValue(0);
 
       await expect(service.remove('abc')).rejects.toThrow(BadRequestException);
-      await expect(service.remove('abc')).rejects.toThrow('No se puede eliminar');
+      await expect(service.remove('abc')).rejects.toThrow(
+        'No se puede eliminar',
+      );
     });
 
     it('should throw BadRequestException when restaurante has associated menu items', async () => {
@@ -309,8 +333,12 @@ describe('RestaurantesService', () => {
       const query = createMockQuery(null);
       mockModel.findByIdAndDelete.mockReturnValue(query);
 
-      await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
-      await expect(service.remove('nonexistent')).rejects.toThrow('Restaurante no encontrado');
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        'Restaurante no encontrado',
+      );
     });
   });
 
@@ -370,7 +398,9 @@ describe('RestaurantesService', () => {
       expect(filter.estado.$in).toEqual(['pendiente', 'en_proceso']);
       expect(update.$set.estado).toBe('cancelado');
       // $each+$slice:-5 mantiene el array acotado en máximo 5 transiciones (diseño)
-      expect(update.$push.historial_estados.$each[0]).toMatchObject({ estado: 'cancelado' });
+      expect(update.$push.historial_estados.$each[0]).toMatchObject({
+        estado: 'cancelado',
+      });
       expect(update.$push.historial_estados.$slice).toBe(-5);
       expect(opts).toMatchObject({ session: mockSession });
     });
@@ -381,14 +411,19 @@ describe('RestaurantesService', () => {
 
       const result = await service.cancelarRestaurante(restauranteId);
 
-      expect(result).toEqual({ cancelado: true, restaurante_id: restauranteId });
+      expect(result).toEqual({
+        cancelado: true,
+        restaurante_id: restauranteId,
+      });
     });
 
     it('should throw NotFoundException and abort when restaurante is not found', async () => {
       const query = createMockQuery(null);
       mockModel.findByIdAndUpdate.mockReturnValue(query);
 
-      await expect(service.cancelarRestaurante('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.cancelarRestaurante('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
       expect(mockSession.abortTransaction).toHaveBeenCalled();
       expect(mockSession.endSession).toHaveBeenCalled();
     });

@@ -73,13 +73,20 @@ describe('SeedService', () => {
       providers: [
         SeedService,
         { provide: getModelToken(Usuario.name), useValue: usuarioModel },
-        { provide: getModelToken(Restaurante.name), useValue: restauranteModel },
+        {
+          provide: getModelToken(Restaurante.name),
+          useValue: restauranteModel,
+        },
         { provide: getModelToken(MenuItem.name), useValue: menuItemModel },
         { provide: getModelToken(Orden.name), useValue: ordenModel },
         { provide: getModelToken(Resena.name), useValue: resenaModel },
         {
           provide: ConfigService,
-          useValue: { get: jest.fn().mockReturnValue('mongodb://localhost:27017/fastpochi') },
+          useValue: {
+            get: jest
+              .fn()
+              .mockReturnValue('mongodb://localhost:27017/fastpochi'),
+          },
         },
         {
           provide: getConnectionToken(),
@@ -95,7 +102,7 @@ describe('SeedService', () => {
 
   describe('clearAll', () => {
     it('should call deleteMany({}) on all five collections', async () => {
-      mockSpawn.mockReturnValue(makeChildProcess(0) as any);
+      mockSpawn.mockReturnValue(makeChildProcess(0));
 
       await service.clearAll();
 
@@ -109,7 +116,12 @@ describe('SeedService', () => {
     it('should run all deletes in parallel via Promise.all', async () => {
       const order: string[] = [];
       const delay = (ms: number, label: string) =>
-        new Promise<void>((res) => setTimeout(() => { order.push(label); res(); }, ms));
+        new Promise<void>((res) =>
+          setTimeout(() => {
+            order.push(label);
+            res();
+          }, ms),
+        );
 
       usuarioModel.deleteMany.mockReturnValue(delay(10, 'usuarios'));
       restauranteModel.deleteMany.mockReturnValue(delay(5, 'restaurantes'));
@@ -130,7 +142,7 @@ describe('SeedService', () => {
 
   describe('run', () => {
     it('should return message and collection counts when ingest exits with code 0', async () => {
-      mockSpawn.mockReturnValue(makeChildProcess(0) as any);
+      mockSpawn.mockReturnValue(makeChildProcess(0));
 
       const result = await service.run();
 
@@ -145,7 +157,7 @@ describe('SeedService', () => {
     });
 
     it('should call countDocuments on all five models after ingest', async () => {
-      mockSpawn.mockReturnValue(makeChildProcess(0) as any);
+      mockSpawn.mockReturnValue(makeChildProcess(0));
 
       await service.run();
 
@@ -158,18 +170,20 @@ describe('SeedService', () => {
 
     it('should throw InternalServerErrorException when ingest script exits with non-zero code', async () => {
       // Each service.run() call spawns a new child, so return a fresh one each time
-      mockSpawn.mockImplementation(() => makeChildProcess(1) as any);
+      mockSpawn.mockImplementation(() => makeChildProcess(1));
 
       await expect(service.run()).rejects.toThrow(InternalServerErrorException);
     });
 
     it('should spawn with MONGODB_URI env variable set from config', async () => {
-      mockSpawn.mockReturnValue(makeChildProcess(0) as any);
+      mockSpawn.mockReturnValue(makeChildProcess(0));
 
       await service.run();
 
       const [, , spawnOptions] = mockSpawn.mock.calls[0];
-      expect(spawnOptions?.env?.MONGODB_URI).toBe('mongodb://localhost:27017/fastpochi');
+      expect(spawnOptions?.env?.MONGODB_URI).toBe(
+        'mongodb://localhost:27017/fastpochi',
+      );
     });
   });
 });

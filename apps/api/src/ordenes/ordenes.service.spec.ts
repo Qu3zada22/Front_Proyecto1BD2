@@ -75,8 +75,16 @@ describe('OrdenesService', () => {
     // Default: ambos items del baseDto están disponibles (con nombre y precio de BD)
     mockMenuItemModel.find.mockReturnValue({
       lean: jest.fn().mockResolvedValue([
-        { _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger', precio: 45 },
-        { _id: new Types.ObjectId('507f1f77bcf86cd799439032'), nombre: 'Fries', precio: 20 },
+        {
+          _id: new Types.ObjectId('507f1f77bcf86cd799439031'),
+          nombre: 'Burger',
+          precio: 45,
+        },
+        {
+          _id: new Types.ObjectId('507f1f77bcf86cd799439032'),
+          nombre: 'Fries',
+          precio: 20,
+        },
       ]),
     });
     // Default: FK validation pasa
@@ -119,8 +127,18 @@ describe('OrdenesService', () => {
       usuario_id: '507f1f77bcf86cd799439011',
       restaurante_id: '507f1f77bcf86cd799439012',
       items: [
-        { menu_item_id: '507f1f77bcf86cd799439031', nombre: 'Burger', precio: 45, cantidad: 2 },
-        { menu_item_id: '507f1f77bcf86cd799439032', nombre: 'Fries', precio: 20, cantidad: 1 },
+        {
+          menu_item_id: '507f1f77bcf86cd799439031',
+          nombre: 'Burger',
+          precio: 45,
+          cantidad: 2,
+        },
+        {
+          menu_item_id: '507f1f77bcf86cd799439032',
+          nombre: 'Fries',
+          precio: 20,
+          cantidad: 1,
+        },
       ],
       direccion_entrega: { calle: '4a Ave', ciudad: 'Guatemala', pais: 'GT' },
     };
@@ -167,8 +185,12 @@ describe('OrdenesService', () => {
       const [bulkOps] = mockMenuItemModel.bulkWrite.mock.calls[0];
 
       expect(bulkOps).toHaveLength(2);
-      expect(bulkOps[0].updateOne.update).toEqual({ $inc: { veces_ordenado: 2 } });
-      expect(bulkOps[1].updateOne.update).toEqual({ $inc: { veces_ordenado: 1 } });
+      expect(bulkOps[0].updateOne.update).toEqual({
+        $inc: { veces_ordenado: 2 },
+      });
+      expect(bulkOps[1].updateOne.update).toEqual({
+        $inc: { veces_ordenado: 1 },
+      });
     });
 
     it('should pass session to bulkWrite so it runs inside the ACID transaction', async () => {
@@ -188,7 +210,10 @@ describe('OrdenesService', () => {
       await service.create(baseDto as any);
 
       expect(mockMenuItemModel.find).toHaveBeenCalledWith(
-        expect.objectContaining({ disponible: true, restaurante_id: expect.anything() }),
+        expect.objectContaining({
+          disponible: true,
+          restaurante_id: expect.anything(),
+        }),
         { _id: 1, nombre: 1, precio: 1 },
         { session: mockSession },
       );
@@ -197,11 +222,21 @@ describe('OrdenesService', () => {
     it('should throw BadRequestException when an item is not disponible', async () => {
       // find returns only 1 of 2 items → one is unavailable
       mockMenuItemModel.find.mockReturnValue({
-        lean: jest.fn().mockResolvedValue([{ _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger', precio: 45 }]),
+        lean: jest.fn().mockResolvedValue([
+          {
+            _id: new Types.ObjectId('507f1f77bcf86cd799439031'),
+            nombre: 'Burger',
+            precio: 45,
+          },
+        ]),
       });
 
-      await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
-      await expect(service.create(baseDto as any)).rejects.toThrow('no están disponibles');
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        'no están disponibles',
+      );
       expect(mockSession.abortTransaction).toHaveBeenCalled();
     });
 
@@ -209,18 +244,36 @@ describe('OrdenesService', () => {
       const duplicateItemDto = {
         ...baseDto,
         items: [
-          { menu_item_id: '507f1f77bcf86cd799439031', nombre: 'Burger', precio: 45, cantidad: 2 },
-          { menu_item_id: '507f1f77bcf86cd799439031', nombre: 'Burger', precio: 45, cantidad: 1 },
+          {
+            menu_item_id: '507f1f77bcf86cd799439031',
+            nombre: 'Burger',
+            precio: 45,
+            cantidad: 2,
+          },
+          {
+            menu_item_id: '507f1f77bcf86cd799439031',
+            nombre: 'Burger',
+            precio: 45,
+            cantidad: 1,
+          },
         ],
       };
       // find returns 1 unique item (deduped) with nombre+precio — check should pass (1 === 1)
       mockMenuItemModel.find.mockReturnValue({
-        lean: jest.fn().mockResolvedValue([{ _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger', precio: 45 }]),
+        lean: jest.fn().mockResolvedValue([
+          {
+            _id: new Types.ObjectId('507f1f77bcf86cd799439031'),
+            nombre: 'Burger',
+            precio: 45,
+          },
+        ]),
       });
       mockOrdenModel.create.mockResolvedValue([{ _id: 'orden1', total: 135 }]);
       mockMenuItemModel.bulkWrite.mockResolvedValue({});
 
-      await expect(service.create(duplicateItemDto as any)).resolves.toBeDefined();
+      await expect(
+        service.create(duplicateItemDto as any),
+      ).resolves.toBeDefined();
       expect(mockSession.abortTransaction).not.toHaveBeenCalled();
       expect(mockSession.commitTransaction).toHaveBeenCalled();
     });
@@ -228,8 +281,12 @@ describe('OrdenesService', () => {
     it('should abort transaction and throw BadRequestException on error', async () => {
       mockOrdenModel.create.mockRejectedValue(new Error('DB error'));
 
-      await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
-      await expect(service.create(baseDto as any)).rejects.toThrow('Error al crear la orden');
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        'Error al crear la orden',
+      );
 
       expect(mockSession.abortTransaction).toHaveBeenCalled();
       expect(mockSession.endSession).toHaveBeenCalled();
@@ -251,8 +308,16 @@ describe('OrdenesService', () => {
       // DB returns different prices than DTO
       mockMenuItemModel.find.mockReturnValue({
         lean: jest.fn().mockResolvedValue([
-          { _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger Real', precio: 50 },
-          { _id: new Types.ObjectId('507f1f77bcf86cd799439032'), nombre: 'Fries Real', precio: 25 },
+          {
+            _id: new Types.ObjectId('507f1f77bcf86cd799439031'),
+            nombre: 'Burger Real',
+            precio: 50,
+          },
+          {
+            _id: new Types.ObjectId('507f1f77bcf86cd799439032'),
+            nombre: 'Fries Real',
+            precio: 25,
+          },
         ]),
       });
       const created = { _id: 'orden1', total: 125 };
@@ -273,24 +338,43 @@ describe('OrdenesService', () => {
     it('should throw BadRequestException when usuario_id does not exist (OBS-01 FK)', async () => {
       mockUsuarioModel.countDocuments.mockResolvedValue(0);
 
-      await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
-      await expect(service.create(baseDto as any)).rejects.toThrow('usuario referenciado no existe');
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        'usuario referenciado no existe',
+      );
     });
 
     it('should throw BadRequestException when restaurante_id does not exist or is inactive (OBS-01/02 FK)', async () => {
       mockRestauranteModel.countDocuments.mockResolvedValue(0);
 
-      await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
-      await expect(service.create(baseDto as any)).rejects.toThrow('restaurante referenciado no existe o está inactivo');
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        'restaurante referenciado no existe o está inactivo',
+      );
     });
 
     it('should parse Decimal128 precio from DB correctly and compute total without NaN (BUG-01 Decimal128)', async () => {
       // Simula el objeto Decimal128 que devuelve .lean() para datos del seed
-      const dec128 = (val: number) => ({ toString: () => String(val), _bsontype: 'Decimal128' });
+      const dec128 = (val: number) => ({
+        toString: () => String(val),
+        _bsontype: 'Decimal128',
+      });
       mockMenuItemModel.find.mockReturnValue({
         lean: jest.fn().mockResolvedValue([
-          { _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger', precio: dec128(45) },
-          { _id: new Types.ObjectId('507f1f77bcf86cd799439032'), nombre: 'Fries',  precio: dec128(20) },
+          {
+            _id: new Types.ObjectId('507f1f77bcf86cd799439031'),
+            nombre: 'Burger',
+            precio: dec128(45),
+          },
+          {
+            _id: new Types.ObjectId('507f1f77bcf86cd799439032'),
+            nombre: 'Fries',
+            precio: dec128(20),
+          },
         ]),
       });
       mockOrdenModel.create.mockResolvedValue([{ _id: 'orden1', total: 110 }]);
@@ -309,12 +393,20 @@ describe('OrdenesService', () => {
       // Solo devuelve 1 de 2 items (el filtro restaurante_id excluye el otro)
       mockMenuItemModel.find.mockReturnValue({
         lean: jest.fn().mockResolvedValue([
-          { _id: new Types.ObjectId('507f1f77bcf86cd799439031'), nombre: 'Burger', precio: 45 },
+          {
+            _id: new Types.ObjectId('507f1f77bcf86cd799439031'),
+            nombre: 'Burger',
+            precio: 45,
+          },
         ]),
       });
 
-      await expect(service.create(baseDto as any)).rejects.toThrow(BadRequestException);
-      await expect(service.create(baseDto as any)).rejects.toThrow('no pertenecen a este restaurante');
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create(baseDto as any)).rejects.toThrow(
+        'no pertenecen a este restaurante',
+      );
       expect(mockSession.abortTransaction).toHaveBeenCalled();
     });
   });
@@ -331,7 +423,10 @@ describe('OrdenesService', () => {
 
       expect(mockOrdenModel.find).toHaveBeenCalledWith({});
       expect(query.populate).toHaveBeenCalledWith('usuario_id', 'nombre email');
-      expect(query.populate).toHaveBeenCalledWith('restaurante_id', 'nombre direccion');
+      expect(query.populate).toHaveBeenCalledWith(
+        'restaurante_id',
+        'nombre direccion',
+      );
       expect(query.sort).toHaveBeenCalledWith({ fecha_creacion: -1 });
       expect(query.skip).toHaveBeenCalledWith(0);
       expect(query.limit).toHaveBeenCalledWith(20);
@@ -397,8 +492,14 @@ describe('OrdenesService', () => {
       const result = await service.findOne('o1');
 
       expect(mockOrdenModel.findById).toHaveBeenCalledWith('o1');
-      expect(query.populate).toHaveBeenCalledWith('usuario_id', 'nombre email telefono');
-      expect(query.populate).toHaveBeenCalledWith('restaurante_id', 'nombre telefono direccion');
+      expect(query.populate).toHaveBeenCalledWith(
+        'usuario_id',
+        'nombre email telefono',
+      );
+      expect(query.populate).toHaveBeenCalledWith(
+        'restaurante_id',
+        'nombre telefono direccion',
+      );
       expect(query.lean).toHaveBeenCalled();
       expect(result).toEqual(doc);
     });
@@ -407,8 +508,12 @@ describe('OrdenesService', () => {
       const query = createMockQuery(null);
       mockOrdenModel.findById.mockReturnValue(query);
 
-      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
-      await expect(service.findOne('nonexistent')).rejects.toThrow('Orden no encontrada');
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        'Orden no encontrada',
+      );
     });
   });
 
@@ -424,12 +529,17 @@ describe('OrdenesService', () => {
 
       const result = await service.updateStatus('o1', 'en_proceso');
 
-      const [filter, update, opts] = mockOrdenModel.findOneAndUpdate.mock.calls[0];
+      const [filter, update, opts] =
+        mockOrdenModel.findOneAndUpdate.mock.calls[0];
       expect(filter).toEqual({ _id: 'o1', estado: 'pendiente' });
       expect(update.$set.estado).toBe('en_proceso');
       // $each + $slice:-5 para mantener array acotado en máximo 5 entradas (diseño)
-      expect(update.$push.historial_estados.$each[0]).toMatchObject({ estado: 'en_proceso' });
-      expect(update.$push.historial_estados.$each[0].timestamp).toBeInstanceOf(Date);
+      expect(update.$push.historial_estados.$each[0]).toMatchObject({
+        estado: 'en_proceso',
+      });
+      expect(update.$push.historial_estados.$each[0].timestamp).toBeInstanceOf(
+        Date,
+      );
       expect(update.$push.historial_estados.$slice).toBe(-5);
       expect(opts).toEqual({ new: true });
       expect(result).toEqual(updated);
@@ -469,8 +579,12 @@ describe('OrdenesService', () => {
       await service.updateStatus('o1', 'en_proceso', actorId);
 
       const [, update] = mockOrdenModel.findOneAndUpdate.mock.calls[0];
-      expect(update.$push.historial_estados.$each[0].actor_id).toBeInstanceOf(Types.ObjectId);
-      expect(update.$push.historial_estados.$each[0].actor_id.toString()).toBe(actorId);
+      expect(update.$push.historial_estados.$each[0].actor_id).toBeInstanceOf(
+        Types.ObjectId,
+      );
+      expect(update.$push.historial_estados.$each[0].actor_id.toString()).toBe(
+        actorId,
+      );
     });
 
     it('should include nota in historial entry when provided', async () => {
@@ -479,10 +593,17 @@ describe('OrdenesService', () => {
       const query = createMockQuery({ _id: 'o1', estado: 'cancelado' });
       mockOrdenModel.findOneAndUpdate.mockReturnValue(query);
 
-      await service.updateStatus('o1', 'cancelado', undefined, 'Cliente canceló');
+      await service.updateStatus(
+        'o1',
+        'cancelado',
+        undefined,
+        'Cliente canceló',
+      );
 
       const [, update] = mockOrdenModel.findOneAndUpdate.mock.calls[0];
-      expect(update.$push.historial_estados.$each[0].nota).toBe('Cliente canceló');
+      expect(update.$push.historial_estados.$each[0].nota).toBe(
+        'Cliente canceló',
+      );
     });
 
     it('should accept valid forward transitions', async () => {
@@ -509,35 +630,45 @@ describe('OrdenesService', () => {
       await expect(service.updateStatus('o1', 'invalid_state')).rejects.toThrow(
         BadRequestException,
       );
-      await expect(service.updateStatus('o1', 'invalid_state')).rejects.toThrow('Estado inválido');
+      await expect(service.updateStatus('o1', 'invalid_state')).rejects.toThrow(
+        'Estado inválido',
+      );
     });
 
     it('should throw BadRequestException for invalid backward transitions', async () => {
       const findQuery = createMockQuery({ _id: 'o1', estado: 'entregado' });
       mockOrdenModel.findById.mockReturnValue(findQuery);
 
-      await expect(service.updateStatus('o1', 'pendiente')).rejects.toThrow(BadRequestException);
-      await expect(service.updateStatus('o1', 'pendiente')).rejects.toThrow('Transición inválida');
+      await expect(service.updateStatus('o1', 'pendiente')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.updateStatus('o1', 'pendiente')).rejects.toThrow(
+        'Transición inválida',
+      );
     });
 
     it('should throw BadRequestException when transitioning from terminal state cancelado', async () => {
       const findQuery = createMockQuery({ _id: 'o1', estado: 'cancelado' });
       mockOrdenModel.findById.mockReturnValue(findQuery);
 
-      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow(BadRequestException);
-      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow('Transición inválida');
+      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow(
+        'Transición inválida',
+      );
     });
 
     it('should throw NotFoundException when orden to update is not found', async () => {
       const findQuery = createMockQuery(null);
       mockOrdenModel.findById.mockReturnValue(findQuery);
 
-      await expect(service.updateStatus('nonexistent', 'en_proceso')).rejects.toThrow(
-        NotFoundException,
-      );
-      await expect(service.updateStatus('nonexistent', 'en_proceso')).rejects.toThrow(
-        'Orden no encontrada',
-      );
+      await expect(
+        service.updateStatus('nonexistent', 'en_proceso'),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateStatus('nonexistent', 'en_proceso'),
+      ).rejects.toThrow('Orden no encontrada');
     });
 
     it('should throw BadRequestException when estado changed between read and write (race condition)', async () => {
@@ -547,8 +678,12 @@ describe('OrdenesService', () => {
       const query = createMockQuery(null);
       mockOrdenModel.findOneAndUpdate.mockReturnValue(query);
 
-      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow(BadRequestException);
-      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow('Conflicto');
+      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.updateStatus('o1', 'en_proceso')).rejects.toThrow(
+        'Conflicto',
+      );
     });
   });
 
@@ -571,12 +706,18 @@ describe('OrdenesService', () => {
 
       expect(mockConnection.startSession).toHaveBeenCalled();
       expect(mockSession.startTransaction).toHaveBeenCalled();
-      expect(mockOrdenModel.findByIdAndDelete).toHaveBeenCalledWith('o1', { session: mockSession });
+      expect(mockOrdenModel.findByIdAndDelete).toHaveBeenCalledWith('o1', {
+        session: mockSession,
+      });
       expect(mockMenuItemModel.bulkWrite).toHaveBeenCalledTimes(1);
       const [bulkOps, opts] = mockMenuItemModel.bulkWrite.mock.calls[0];
       expect(bulkOps).toHaveLength(2);
-      expect(bulkOps[0].updateOne.update).toEqual({ $inc: { veces_ordenado: -2 } });
-      expect(bulkOps[1].updateOne.update).toEqual({ $inc: { veces_ordenado: -1 } });
+      expect(bulkOps[0].updateOne.update).toEqual({
+        $inc: { veces_ordenado: -2 },
+      });
+      expect(bulkOps[1].updateOne.update).toEqual({
+        $inc: { veces_ordenado: -1 },
+      });
       expect(opts).toMatchObject({ session: mockSession });
       expect(mockSession.commitTransaction).toHaveBeenCalled();
       expect(mockSession.endSession).toHaveBeenCalled();
@@ -587,8 +728,12 @@ describe('OrdenesService', () => {
       const query = createMockQuery(null);
       mockOrdenModel.findByIdAndDelete.mockReturnValue(query);
 
-      await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
-      await expect(service.remove('nonexistent')).rejects.toThrow('Orden no encontrada');
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        'Orden no encontrada',
+      );
       expect(mockSession.abortTransaction).toHaveBeenCalled();
       expect(mockSession.endSession).toHaveBeenCalled();
     });
@@ -615,12 +760,18 @@ describe('OrdenesService', () => {
 
       expect(mockConnection.startSession).toHaveBeenCalled();
       expect(mockSession.startTransaction).toHaveBeenCalled();
-      expect(mockOrdenModel.deleteMany).toHaveBeenCalledWith({ _id: { $in: ids } });
+      expect(mockOrdenModel.deleteMany).toHaveBeenCalledWith({
+        _id: { $in: ids },
+      });
       expect(mockMenuItemModel.bulkWrite).toHaveBeenCalledTimes(1);
       const [bulkOps, opts] = mockMenuItemModel.bulkWrite.mock.calls[0];
       expect(bulkOps).toHaveLength(2);
-      expect(bulkOps[0].updateOne.update).toEqual({ $inc: { veces_ordenado: -3 } });
-      expect(bulkOps[1].updateOne.update).toEqual({ $inc: { veces_ordenado: -1 } });
+      expect(bulkOps[0].updateOne.update).toEqual({
+        $inc: { veces_ordenado: -3 },
+      });
+      expect(bulkOps[1].updateOne.update).toEqual({
+        $inc: { veces_ordenado: -1 },
+      });
       expect(opts).toMatchObject({ session: mockSession });
       expect(mockSession.commitTransaction).toHaveBeenCalled();
       expect(mockSession.endSession).toHaveBeenCalled();

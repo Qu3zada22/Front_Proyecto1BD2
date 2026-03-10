@@ -95,7 +95,10 @@ describe('ResponseInterceptor', () => {
       const data = {
         total: makeFakeDecimal128('690.00'),
         items: [
-          { precio_unitario: makeFakeDecimal128('135.00'), subtotal: makeFakeDecimal128('270.00') },
+          {
+            precio_unitario: makeFakeDecimal128('135.00'),
+            subtotal: makeFakeDecimal128('270.00'),
+          },
         ],
       };
       const result = await intercept(data);
@@ -163,7 +166,10 @@ describe('ResponseInterceptor', () => {
   describe('Mongoose hydrated document via toJSON()', () => {
     it('should call toJSON() on objects that have it and normalize the result', async () => {
       const doc = {
-        toJSON: () => ({ precio: makeFakeDecimal128('95.00'), nombre: 'Pepián' }),
+        toJSON: () => ({
+          precio: makeFakeDecimal128('95.00'),
+          nombre: 'Pepián',
+        }),
       };
       const result = await intercept(doc);
 
@@ -173,13 +179,13 @@ describe('ResponseInterceptor', () => {
 
     it('should not call toJSON() on Date objects', async () => {
       const date = new Date('2026-01-01');
-      const toJSONSpy = jest.spyOn(date, 'toISOString'); // Date has toJSON alias
+      jest.spyOn(date, 'toISOString'); // Date has toJSON alias
       const data = { fecha: date };
 
       await intercept(data);
 
       // toJSON on Date is just toISOString; we verify the Date was NOT unwrapped
-      expect(result => result).toBeDefined(); // just ensure no throw
+      expect((result) => result).toBeDefined(); // just ensure no throw
     });
   });
 });

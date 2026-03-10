@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
-import { NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
 import { Usuario } from './schemas/usuario.schema';
 import { Orden } from '../ordenes/schemas/orden.schema';
@@ -106,7 +110,11 @@ describe('UsuariosService', () => {
         password: 'pw',
         rol: 'cliente',
       };
-      mockModel.create.mockResolvedValue({ _id: 'u2', ...data, email: 'ana@example.com' });
+      mockModel.create.mockResolvedValue({
+        _id: 'u2',
+        ...data,
+        email: 'ana@example.com',
+      });
 
       await service.create(data);
 
@@ -223,7 +231,11 @@ describe('UsuariosService', () => {
     });
 
     it('should trim whitespace from email before querying', async () => {
-      const query = createMockQuery({ _id: 'u1', email: 'juan@example.com', activo: true });
+      const query = createMockQuery({
+        _id: 'u1',
+        email: 'juan@example.com',
+        activo: true,
+      });
       mockModel.findOne.mockReturnValue(query);
 
       await service.login('  juan@example.com  ');
@@ -281,8 +293,12 @@ describe('UsuariosService', () => {
       const query = createMockQuery(null);
       mockModel.findById.mockReturnValue(query);
 
-      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
-      await expect(service.findOne('nonexistent')).rejects.toThrow('Usuario no encontrado');
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        'Usuario no encontrado',
+      );
     });
   });
 
@@ -309,8 +325,12 @@ describe('UsuariosService', () => {
       const query = createMockQuery(null);
       mockModel.findByIdAndUpdate.mockReturnValue(query);
 
-      await expect(service.update('nonexistent', {})).rejects.toThrow(NotFoundException);
-      await expect(service.update('nonexistent', {})).rejects.toThrow('Usuario no encontrado');
+      await expect(service.update('nonexistent', {})).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.update('nonexistent', {})).rejects.toThrow(
+        'Usuario no encontrado',
+      );
     });
   });
 
@@ -326,9 +346,15 @@ describe('UsuariosService', () => {
 
       const result = await service.remove('u1');
 
-      expect(mockOrdenModel.countDocuments).toHaveBeenCalledWith({ usuario_id: 'u1' });
-      expect(mockResenaModel.countDocuments).toHaveBeenCalledWith({ usuario_id: 'u1' });
-      expect(mockRestauranteModel.countDocuments).toHaveBeenCalledWith({ propietario_id: 'u1' });
+      expect(mockOrdenModel.countDocuments).toHaveBeenCalledWith({
+        usuario_id: 'u1',
+      });
+      expect(mockResenaModel.countDocuments).toHaveBeenCalledWith({
+        usuario_id: 'u1',
+      });
+      expect(mockRestauranteModel.countDocuments).toHaveBeenCalledWith({
+        propietario_id: 'u1',
+      });
       expect(mockModel.findByIdAndDelete).toHaveBeenCalledWith('u1');
       expect(result).toEqual({ deleted: true });
     });
@@ -368,8 +394,12 @@ describe('UsuariosService', () => {
       const query = createMockQuery(null);
       mockModel.findByIdAndDelete.mockReturnValue(query);
 
-      await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
-      await expect(service.remove('nonexistent')).rejects.toThrow('Usuario no encontrado');
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        'Usuario no encontrado',
+      );
     });
   });
 
@@ -383,7 +413,9 @@ describe('UsuariosService', () => {
 
       const result = await service.findByEmail('juan@example.com');
 
-      expect(mockModel.findOne).toHaveBeenCalledWith({ email: 'juan@example.com' });
+      expect(mockModel.findOne).toHaveBeenCalledWith({
+        email: 'juan@example.com',
+      });
       expect(query.select).toHaveBeenCalledWith('-password');
       expect(query.lean).toHaveBeenCalled();
       expect(result).toEqual(doc);
@@ -393,7 +425,9 @@ describe('UsuariosService', () => {
       const query = createMockQuery(null);
       mockModel.findOne.mockReturnValue(query);
 
-      await expect(service.findByEmail('noone@example.com')).rejects.toThrow(NotFoundException);
+      await expect(service.findByEmail('noone@example.com')).rejects.toThrow(
+        NotFoundException,
+      );
       await expect(service.findByEmail('noone@example.com')).rejects.toThrow(
         'Usuario no encontrado',
       );
@@ -404,7 +438,12 @@ describe('UsuariosService', () => {
 
   describe('addAddress', () => {
     it('should use $push with $each and $slice:-10 to enforce max 10 addresses', async () => {
-      const newAddress = { alias: 'Casa', calle: '4a Ave', ciudad: 'GT', pais: 'Guatemala' };
+      const newAddress = {
+        alias: 'Casa',
+        calle: '4a Ave',
+        ciudad: 'GT',
+        pais: 'Guatemala',
+      };
       const updated = { _id: 'u1', direcciones: [newAddress] };
       const query = createMockQuery(updated);
       mockModel.findByIdAndUpdate.mockReturnValue(query);
@@ -424,8 +463,12 @@ describe('UsuariosService', () => {
       const query = createMockQuery(null);
       mockModel.findByIdAndUpdate.mockReturnValue(query);
 
-      await expect(service.addAddress('nonexistent', {})).rejects.toThrow(NotFoundException);
-      await expect(service.addAddress('nonexistent', {})).rejects.toThrow('Usuario no encontrado');
+      await expect(service.addAddress('nonexistent', {})).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.addAddress('nonexistent', {})).rejects.toThrow(
+        'Usuario no encontrado',
+      );
     });
   });
 
@@ -452,10 +495,12 @@ describe('UsuariosService', () => {
       const query = createMockQuery(null);
       mockModel.findByIdAndUpdate.mockReturnValue(query);
 
-      await expect(service.removeAddress('nonexistent', 'Casa')).rejects.toThrow(NotFoundException);
-      await expect(service.removeAddress('nonexistent', 'Casa')).rejects.toThrow(
-        'Usuario no encontrado',
-      );
+      await expect(
+        service.removeAddress('nonexistent', 'Casa'),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.removeAddress('nonexistent', 'Casa'),
+      ).rejects.toThrow('Usuario no encontrado');
     });
   });
 });
