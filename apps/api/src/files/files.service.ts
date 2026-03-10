@@ -4,6 +4,7 @@ import { Connection } from 'mongoose';
 import { GridFSBucket, ObjectId } from 'mongodb';
 import { Readable } from 'stream';
 import type { Response } from 'express';
+import sharp from 'sharp';
 
 @Injectable()
 export class FilesService implements OnModuleInit {
@@ -17,12 +18,32 @@ export class FilesService implements OnModuleInit {
     });
   }
 
+  private readonly IMAGE_MIMES = new Set([
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+  ]);
+
   async upload(
     file: Express.Multer.File,
   ): Promise<{ id: string; filename: string }> {
-    const readable = Readable.from(file.buffer);
-    const uploadStream = this.bucket.openUploadStream(file.originalname, {
-      metadata: { contentType: file.mimetype, uploadedAt: new Date() },
+    let buffer = file.buffer;
+    let contentType = file.mimetype;
+    let filename = file.originalname;
+
+    if (this.IMAGE_MIMES.has(file.mimetype)) {
+      buffer = await sharp(file.buffer)
+        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 75 })
+        .toBuffer();
+      contentType = 'image/webp';
+      filename = filename.replace(/\.[^.]+$/, '.webp');
+    }
+
+    const readable = Readable.from(buffer);
+    const uploadStream = this.bucket.openUploadStream(filename, {
+      metadata: { contentType, uploadedAt: new Date() },
     });
 
     readable.pipe(uploadStream);
@@ -31,7 +52,7 @@ export class FilesService implements OnModuleInit {
       uploadStream.on('finish', () =>
         resolve({
           id: uploadStream.id.toString(),
-          filename: file.originalname,
+          filename,
         }),
       );
       uploadStream.on('error', reject);
