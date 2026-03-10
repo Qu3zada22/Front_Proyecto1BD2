@@ -57,8 +57,8 @@ export default function ClientePedidos() {
       restaurante_id: orden.restaurante_id,
       orden_id: orden._id,
       calificacion: rating,
-      ...(titulo.trim() && { titulo: titulo.trim() }),
-      ...(comentario.trim() && { comentario: comentario.trim() }),
+      titulo: titulo.trim(),
+      comentario: comentario.trim(),
       tags: selectedTags,
     })
     setReviewOrderId(null)

@@ -197,7 +197,6 @@ export default function ClienteRestaurante() {
               <div className="flex flex-col gap-4">
                 {resenas.map((re) => {
                   const autor = re.usuario_nombre
-                  const _hasLiked = user ? re.likes.includes(user._id) : false
                   return (
                     <Card key={re._id} className="border-0 shadow-sm">
                       <CardContent className="p-4">

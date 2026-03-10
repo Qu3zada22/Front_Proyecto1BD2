@@ -14,6 +14,7 @@ import { PreferenceTags } from "@/components/fastpochi/preference-tags"
 import { useAuth, useData } from "@/lib/store"
 import { api } from "@/lib/api"
 import { REVIEW_TAGS } from "@/lib/mock-data"
+import type { Orden } from "@/lib/mock-data"
 
 export default function ClientePedidoTracking() {
   const { id } = useParams<{ id: string }>()
@@ -24,7 +25,7 @@ export default function ClientePedidoTracking() {
   const [titulo, setTitulo] = useState("")
   const [comentario, setComentario] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [ordenApi, setOrdenApi] = useState<any>(null)
+  const [ordenApi, setOrdenApi] = useState<Orden | null>(null)
   const [fetchDone, setFetchDone] = useState(false)
 
   const ordenFromStore = ordenes.find((o) => o._id === id)
