@@ -3,6 +3,16 @@ import { getConnectionToken } from '@nestjs/mongoose';
 import { NotFoundException } from '@nestjs/common';
 import { FilesService } from './files.service';
 
+// ── mock sharp ────────────────────────────────────────────────────────────────
+jest.mock('sharp', () => {
+  const mockSharp = jest.fn(() => ({
+    resize: jest.fn().mockReturnThis(),
+    webp: jest.fn().mockReturnThis(),
+    toBuffer: jest.fn().mockResolvedValue(Buffer.from('compressed')),
+  }));
+  return { __esModule: true, default: mockSharp };
+});
+
 // ── mock GridFSBucket ─────────────────────────────────────────────────────────
 
 const mockUploadStream = {
@@ -96,9 +106,9 @@ describe('FilesService', () => {
       await service.upload(mockFile);
 
       expect(mockBucket.openUploadStream).toHaveBeenCalledWith(
-        'photo.png',
+        'photo.webp',
         expect.objectContaining({
-          metadata: expect.objectContaining({ contentType: 'image/png' }),
+          metadata: expect.objectContaining({ contentType: 'image/webp' }),
         }),
       );
     });
@@ -113,7 +123,7 @@ describe('FilesService', () => {
 
       const result = await service.upload(mockFile);
 
-      expect(result).toEqual({ id: 'file-id-123', filename: 'photo.png' });
+      expect(result).toEqual({ id: 'file-id-123', filename: 'photo.webp' });
     });
 
     it('should include metadata with contentType and uploadedAt in the upload stream options', async () => {
@@ -127,7 +137,7 @@ describe('FilesService', () => {
       await service.upload(mockFile);
 
       const [, options] = mockBucket.openUploadStream.mock.calls[0];
-      expect(options.metadata.contentType).toBe('image/png');
+      expect(options.metadata.contentType).toBe('image/webp');
       expect(options.metadata.uploadedAt).toBeInstanceOf(Date);
     });
   });
