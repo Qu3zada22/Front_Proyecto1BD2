@@ -20,31 +20,41 @@ export default function ClienteCarrito() {
   )
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
+  const [orderError, setOrderError] = useState<string | null>(null)
+  const [ordering, setOrdering] = useState(false)
 
   const restaurante = restaurantes.find((r) => r._id === restauranteId)
 
   const handleConfirmOrder = async () => {
     if (!user || items.length === 0) return
-    const dir = user.direcciones.find((d) => d.alias === selectedDireccion) || user.direcciones[0]
-    const orderId = await createOrder({
-      usuario_id: user._id,
-      restaurante_id: restauranteId!,
-      items: items.map((i) => ({
-        item_id: i.item_id,
-        nombre: i.nombre,
-        precio_unitario: i.precio,
-        cantidad: i.cantidad,
-        subtotal: i.precio * i.cantidad,
-      })),
-      total,
-      direccion_entrega: dir
-        ? { alias: dir.alias, calle: dir.calle, ciudad: dir.ciudad, pais: dir.pais }
-        : { alias: "Casa", calle: "Sin direccion", ciudad: "Guatemala", pais: "GT" },
-      notas: notas || undefined,
-    })
-    setCreatedOrderId(orderId)
-    setShowConfirmation(true)
-    clearCart()
+    setOrdering(true)
+    setOrderError(null)
+    try {
+      const dir = user.direcciones?.find((d) => d.alias === selectedDireccion) ?? user.direcciones?.[0]
+      const orderId = await createOrder({
+        usuario_id: user._id,
+        restaurante_id: restauranteId!,
+        items: items.map((i) => ({
+          item_id: i.item_id,
+          nombre: i.nombre,
+          precio_unitario: i.precio,
+          cantidad: i.cantidad,
+          subtotal: i.precio * i.cantidad,
+        })),
+        total,
+        direccion_entrega: dir
+          ? { alias: dir.alias, calle: dir.calle, ciudad: dir.ciudad, pais: dir.pais }
+          : { alias: "Casa", calle: "Sin direccion", ciudad: "Guatemala", pais: "GT" },
+        notas: notas || undefined,
+      })
+      setCreatedOrderId(orderId)
+      setShowConfirmation(true)
+      clearCart()
+    } catch (err) {
+      setOrderError(err instanceof Error ? err.message : "Error al crear el pedido")
+    } finally {
+      setOrdering(false)
+    }
   }
 
   if (items.length === 0 && !showConfirmation) {
@@ -76,7 +86,16 @@ export default function ClienteCarrito() {
         {items.map((item) => (
           <Card key={item.item_id} className="border-0 shadow-sm">
             <CardContent className="flex items-center gap-3 p-3">
-              <img src={item.imagen} alt={item.nombre} className="h-16 w-16 flex-shrink-0 rounded-lg object-cover" />
+              <div className="h-16 w-16 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
+                {item.imagen && (
+                  <img
+                    src={item.imagen}
+                    alt={item.nombre}
+                    className="h-full w-full object-cover"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
+                  />
+                )}
+              </div>
               <div className="flex-1">
                 <h3 className="font-medium text-foreground">{item.nombre}</h3>
                 <p className="text-sm text-primary">Q{item.precio.toFixed(2)}</p>
@@ -127,8 +146,11 @@ export default function ClienteCarrito() {
             </div>
           </CardContent>
         </Card>
-        <Button size="lg" className="w-full text-base" onClick={handleConfirmOrder}>
-          Confirmar Pedido
+        {orderError && (
+          <p className="text-sm text-destructive text-center">{orderError}</p>
+        )}
+        <Button size="lg" className="w-full text-base" onClick={handleConfirmOrder} disabled={ordering}>
+          {ordering ? "Enviando pedido..." : "Confirmar Pedido"}
         </Button>
       </div>
 

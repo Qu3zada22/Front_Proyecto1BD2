@@ -51,7 +51,6 @@ function normalizeMenuItem(m: any): any {
   }
 }
 
-// API usa "confirmado", frontend usa "en_proceso"
 function normalizeOrden(o: any): any {
   // usuario_id puede estar populado como objeto {_id, nombre, email} o como string
   const usuarioObj = o.usuario_id
@@ -67,7 +66,7 @@ function normalizeOrden(o: any): any {
     _id: o._id?.toString(),
     usuario_id: usuarioId ?? '',
     restaurante_id: restauranteId ?? '',
-    estado: o.estado === 'confirmado' ? 'en_proceso' : (o.estado ?? 'pendiente'),
+    estado: o.estado ?? 'pendiente',
     historial_estados: o.historial_estados ?? [],
     tiene_resena: o.tiene_resena ?? false,
     fecha_creacion: o.fecha_creacion ?? o.createdAt ?? '',
@@ -80,8 +79,36 @@ function normalizeOrden(o: any): any {
   }
 }
 
-function toApiEstado(e: string): string {
-  return e === 'en_proceso' ? 'confirmado' : e
+function normalizeResena(r: any): any {
+  const usuarioObj = r.usuario_id
+  const usuarioId = typeof usuarioObj === 'object' && usuarioObj !== null
+    ? usuarioObj._id?.toString()
+    : usuarioObj?.toString()
+  const usuarioNombre = typeof usuarioObj === 'object' && usuarioObj !== null
+    ? usuarioObj.nombre
+    : undefined
+
+  const restauranteObj = r.restaurante_id
+  const restauranteId = typeof restauranteObj === 'object' && restauranteObj !== null && restauranteObj._id
+    ? restauranteObj._id?.toString()
+    : restauranteObj?.toString?.() ?? restauranteObj
+  const restauranteNombre = typeof restauranteObj === 'object' && restauranteObj !== null
+    ? restauranteObj.nombre
+    : undefined
+
+  return {
+    ...r,
+    _id: r._id?.toString(),
+    usuario_id: usuarioId ?? '',
+    usuario_nombre: usuarioNombre,
+    restaurante_id: restauranteId ?? '',
+    restaurante_nombre: restauranteNombre,
+    orden_id: r.orden_id?.toString?.() ?? r.orden_id,
+    likes: r.likes ?? [],
+    tags: r.tags ?? [],
+    activa: r.activa ?? true,
+    fecha: r.fecha ?? r.createdAt ?? '',
+  }
 }
 
 // ── API object ───────────────────────────────────────────────
@@ -120,6 +147,11 @@ export const api = {
 
   // Menu Items
   getMenuItems: (restauranteId: string) =>
+    req<any[]>(`/menu-items?restaurante_id=${restauranteId}&disponible=true`)
+      .then((ms) => ms.map(normalizeMenuItem)),
+
+  // Todos los ítems (para gestión del propietario — incluye no disponibles)
+  getMenuItemsManage: (restauranteId: string) =>
     req<any[]>(`/menu-items?restaurante_id=${restauranteId}`)
       .then((ms) => ms.map(normalizeMenuItem)),
 
@@ -138,6 +170,9 @@ export const api = {
     req<any>(`/menu-items/restaurant/${restauranteId}`, { method: 'DELETE' }),
 
   // Orders
+  getOrder: (id: string) =>
+    req<any>(`/orders/${id}`).then(normalizeOrden),
+
   getOrders: (params?: { cliente_id?: string; restaurante_id?: string; estado?: string; limit?: string }) => {
     const qs = params ? `?${new URLSearchParams(params as any)}` : ''
     return req<any[]>(`/orders${qs}`).then((os) => os.map(normalizeOrden))
@@ -164,12 +199,15 @@ export const api = {
   updateOrderStatus: (id: string, estado: string) =>
     req<any>(`/orders/${id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ estado: toApiEstado(estado) }),
+      body: JSON.stringify({ estado }),
     }).then(normalizeOrden),
 
   // Reviews
-  getReviews: (restauranteId: string) =>
-    req<any[]>(`/reviews/restaurant/${restauranteId}`),
+  getReviews: (restauranteId: string, skip = 0, limit = 10) =>
+    req<any[]>(`/reviews/restaurant/${restauranteId}?skip=${skip}&limit=${limit}`).then((rs) => rs.map(normalizeResena)),
+
+  getReviewsByUser: (userId: string) =>
+    req<any[]>(`/reviews/user/${userId}`).then((rs) => rs.map(normalizeResena)),
 
   createReview: (data: any) =>
     req<any>('/reviews', { method: 'POST', body: JSON.stringify(data) }),
@@ -188,6 +226,16 @@ export const api = {
     return req<any[]>(`/reports/revenue/by-day?${qs}`)
   },
   getRestaurantesByCategory: () => req<any[]>('/reports/restaurants/by-category'),
+
+  // Files
+  uploadFile: async (file: File): Promise<{ id: string; filename: string }> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch(`${BASE}/files/upload`, { method: 'POST', body: formData })
+    const json = await res.json()
+    if (!json.success) throw new Error(json.message || 'Error subiendo archivo')
+    return json.data as { id: string; filename: string }
+  },
 
   // Seed
   runSeed: () => req<any>('/seed', { method: 'POST' }),

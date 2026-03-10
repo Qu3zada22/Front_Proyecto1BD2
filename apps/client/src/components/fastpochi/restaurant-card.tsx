@@ -13,14 +13,19 @@ interface RestaurantCardProps {
 }
 
 export function RestaurantCard({ restaurant, href, className }: RestaurantCardProps) {
+  const hasCover = !!restaurant.img_portada
+
   const content = (
     <Card className={cn("group overflow-hidden transition-all hover:shadow-lg border-0 shadow-sm", className)}>
-      <div className="relative h-44 w-full overflow-hidden">
-        <img
-          src={restaurant.img_portada}
-          alt={restaurant.nombre}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
+      <div className="relative h-44 w-full overflow-hidden bg-gradient-to-br from-primary/20 to-primary/5">
+        {hasCover && (
+          <img
+            src={restaurant.img_portada}
+            alt={restaurant.nombre}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
+          />
+        )}
         {!restaurant.activo && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
             <Badge variant="destructive" className="text-sm">Inactivo</Badge>

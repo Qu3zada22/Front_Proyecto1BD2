@@ -16,21 +16,20 @@ export class ResenasService {
 
     // Transacción ACID: insert reseña + actualizar campos desnormalizados
     async create(data: any): Promise<ResenaDocument> {
-        // Validar FK: restaurante_id debe existir si se proporciona
-        if (data.restaurante_id) {
-            const restExists = await this.restauranteModel.countDocuments({ _id: data.restaurante_id });
-            if (!restExists) throw new BadRequestException('El restaurante referenciado no existe');
-        }
-        // Validar FK: orden_id debe existir si se proporciona
-        if (data.orden_id) {
-            const ordenExists = await this.ordenModel.countDocuments({ _id: data.orden_id });
-            if (!ordenExists) throw new BadRequestException('La orden referenciada no existe');
-        }
-
         const session = await this.connection.startSession();
         session.startTransaction();
         try {
-            const [resena] = await this.resenaModel.create([data], { session });
+            const doc: any = {
+                usuario_id: new Types.ObjectId(data.usuario_id),
+                calificacion: data.calificacion,
+            };
+            if (data.restaurante_id) doc.restaurante_id = new Types.ObjectId(data.restaurante_id);
+            if (data.orden_id) doc.orden_id = new Types.ObjectId(data.orden_id);
+            if (data.titulo) doc.titulo = data.titulo;
+            if (data.comentario) doc.comentario = data.comentario;
+            if (data.tags) doc.tags = data.tags;
+
+            const [resena] = await this.resenaModel.create([doc], { session });
 
             // Actualizar calificacion_prom y total_resenas del restaurante (campo desnormalizado)
             if (data.restaurante_id) {
@@ -83,6 +82,21 @@ export class ResenasService {
             .exec();
     }
 
+    async findByUser(userId: string): Promise<any[]> {
+        return this.resenaModel
+            .find({
+                $or: [
+                    { usuario_id: new Types.ObjectId(userId) },
+                    { usuario_id: userId },
+                ],
+                activa: true,
+            })
+            .populate('restaurante_id', 'nombre img_portada')
+            .sort({ fecha: -1 })
+            .lean()
+            .exec();
+    }
+
     // $addToSet — agrega like sin duplicados
     async addLike(id: string, userId: string): Promise<ResenaDocument> {
         const updated = await this.resenaModel
@@ -110,40 +124,16 @@ export class ResenasService {
     }
 
     async remove(id: string): Promise<{ deleted: boolean }> {
-        const session = await this.connection.startSession();
-        session.startTransaction();
-        try {
-            const resena = await this.resenaModel.findByIdAndDelete(id, { session }).exec();
-            if (!resena) throw new NotFoundException('Reseña no encontrada');
+        const result = await this.resenaModel.findByIdAndDelete(id).lean().exec();
+        if (!result) throw new NotFoundException('Reseña no encontrada');
 
-            // Recalcular calificacion_prom y total_resenas del restaurante
-            if (resena.restaurante_id) {
-                const [stats] = await this.resenaModel.aggregate([
-                    { $match: { restaurante_id: resena.restaurante_id, activa: true } },
-                    { $group: { _id: null, avg: { $avg: '$calificacion' }, count: { $sum: 1 } } },
-                ]).session(session);
-                await this.restauranteModel.findByIdAndUpdate(resena.restaurante_id, {
-                    $set: {
-                        calificacion_prom: stats ? Math.round(stats.avg * 10) / 10 : 0,
-                        total_resenas: stats?.count ?? 0,
-                    },
-                }, { session });
-            }
-
-            // Resetear tiene_resena en la orden
-            if (resena.orden_id) {
-                await this.ordenModel.findByIdAndUpdate(resena.orden_id, {
-                    $set: { tiene_resena: false },
-                }, { session });
-            }
-
-            await session.commitTransaction();
-            return { deleted: true };
-        } catch (err) {
-            await session.abortTransaction();
-            throw err;
-        } finally {
-            await session.endSession();
+        // Revertir tiene_resena en la orden asociada
+        if (result.orden_id) {
+            await this.ordenModel.findByIdAndUpdate(result.orden_id, {
+                $set: { tiene_resena: false },
+            });
         }
+
+        return { deleted: true };
     }
 }

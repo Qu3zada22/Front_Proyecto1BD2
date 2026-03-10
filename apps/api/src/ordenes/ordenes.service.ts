@@ -84,7 +84,14 @@ export class OrdenesService {
             const total = itemsMapped.reduce((sum, i) => sum + i.subtotal, 0);
 
             const [orden] = await this.ordenModel.create(
-                [{ ...dto, items: itemsMapped, total }] as any[],
+                [{
+                    usuario_id: new Types.ObjectId(dto.usuario_id),
+                    restaurante_id: new Types.ObjectId(dto.restaurante_id),
+                    items: itemsMapped,
+                    total,
+                    direccion_entrega: dto.direccion_entrega,
+                    notas: dto.notas,
+                }],
                 { session },
             );
 
@@ -116,7 +123,10 @@ export class OrdenesService {
         limit?: number;
     }): Promise<any[]> {
         const filter: any = {};
-        if (query.cliente_id) filter.usuario_id = new Types.ObjectId(query.cliente_id);
+        if (query.cliente_id) {
+            const oid = new Types.ObjectId(query.cliente_id);
+            filter.$or = [{ usuario_id: oid }, { usuario_id: query.cliente_id }];
+        }
         if (query.restaurante_id) filter.restaurante_id = new Types.ObjectId(query.restaurante_id);
         if (query.estado) filter.estado = query.estado;
 

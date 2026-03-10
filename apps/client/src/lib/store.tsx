@@ -85,7 +85,10 @@ interface DataContextType {
   adminUsers: Usuario[]
   // Lazy loaders
   loadMenuItems: (restauranteId: string) => Promise<void>
+  loadMenuItemsManage: (restauranteId: string) => Promise<void>
   loadOrdenes: (params?: { cliente_id?: string; restaurante_id?: string }) => Promise<void>
+  loadOrdenesPropietario: (restauranteIds: string[]) => Promise<void>
+  loadResenas: (restauranteId: string) => Promise<void>
   // Admin user management
   toggleUserActivo: (id: string) => void
   deleteUser: (id: string) => void
@@ -149,10 +152,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     init()
   }, [])
 
-  // Lazy load menu items per restaurant
+  // Lazy load menu items per restaurant (solo disponibles — para vista cliente)
   const loadMenuItems = useCallback(async (restauranteId: string) => {
     try {
       const items = await api.getMenuItems(restauranteId)
+      setMenuItems((prev) => {
+        const others = prev.filter((i) => i.restaurante_id !== restauranteId)
+        return [...others, ...(items as MenuItem[])]
+      })
+    } catch (err) {
+      console.error("Error cargando menu items:", err)
+    }
+  }, [])
+
+  // Todos los ítems del restaurante (disponibles + no disponibles — para gestión del propietario)
+  const loadMenuItemsManage = useCallback(async (restauranteId: string) => {
+    try {
+      const items = await api.getMenuItemsManage(restauranteId)
       setMenuItems((prev) => {
         const others = prev.filter((i) => i.restaurante_id !== restauranteId)
         return [...others, ...(items as MenuItem[])]
@@ -169,6 +185,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setOrdenes(orders as Orden[])
     } catch (err) {
       console.error("Error cargando ordenes:", err)
+    }
+  }, [])
+
+  // Load orders for multiple restaurants (propietario use case)
+  const loadOrdenesPropietario = useCallback(async (restauranteIds: string[]) => {
+    if (!restauranteIds.length) return
+    try {
+      const results = await Promise.all(
+        restauranteIds.map((id) => api.getOrders({ restaurante_id: id, limit: "100" }))
+      )
+      const all = results.flat() as Orden[]
+      setOrdenes((prev) => {
+        const others = prev.filter((o) => !restauranteIds.includes(o.restaurante_id))
+        return [...others, ...all]
+      })
+    } catch (err) {
+      console.error("Error cargando ordenes del propietario:", err)
+    }
+  }, [])
+
+  // Lazy load reviews per restaurant
+  const loadResenas = useCallback(async (restauranteId: string) => {
+    try {
+      const data = await api.getReviews(restauranteId)
+      setResenas((prev) => {
+        const others = prev.filter((r) => r.restaurante_id !== restauranteId)
+        return [...others, ...(data as Resena[])]
+      })
+    } catch (err) {
+      console.error("Error cargando reseñas:", err)
     }
   }, [])
 
@@ -199,8 +245,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // --- Menu Items ---
   const addMenuItem = useCallback(async (item: Omit<MenuItem, "_id" | "fecha_creacion" | "veces_ordenado">) => {
-    const created = await api.createMenuItem(item)
-    setMenuItems((prev) => [...prev, created as MenuItem])
+    await api.createMenuItem(item)
+    // El caller hace loadMenuItemsManage para recargar desde servidor
   }, [])
 
   const updateMenuItem = useCallback(async (id: string, data: Partial<MenuItem>) => {
@@ -323,7 +369,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     <DataContext.Provider value={{
       restaurantes, menuItems: menuItemsList, ordenes, resenas, notifications, loading,
       adminUsers, toggleUserActivo, deleteUser, deleteUsers,
-      loadMenuItems, loadOrdenes,
+      loadMenuItems, loadMenuItemsManage, loadOrdenes, loadOrdenesPropietario, loadResenas,
       addRestaurante, updateRestaurante, deleteRestaurante, toggleRestauranteActivo,
       addMenuItem, updateMenuItem, deleteMenuItem, deleteMenuItems, toggleMenuItemDisponible, setMenuItemsDisponible,
       createOrder, advanceOrderStatus, cancelOrder,

@@ -1,6 +1,6 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { ArrowLeft, Plus, Pencil, Trash2, Eye, EyeOff, Save, X, Upload, ImageIcon } from "lucide-react"
+import { ArrowLeft, Plus, Pencil, Trash2, Eye, EyeOff, Save, X, Upload, ImageIcon, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { StarRating } from "@/components/fastpochi/star-rating"
 import { StatusBadge } from "@/components/fastpochi/status-badge"
 import { useAuth, useData } from "@/lib/store"
+import { api } from "@/lib/api"
 import type { MenuItem } from "@/lib/mock-data"
 
 type MenuCategory = MenuItem["categoria"]
@@ -26,18 +27,35 @@ const CATEGORY_LABELS: Record<MenuCategory, string> = {
 
 const CATEGORY_ORDER: MenuCategory[] = ["entrada", "principal", "postre", "bebida", "extra"]
 
-const DEFAULT_IMG = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop"
-
 export default function PropietarioMenu() {
   const { id: restId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { restaurantes, menuItems, resenas, addMenuItem, updateMenuItem, deleteMenuItem, deleteMenuItems, toggleMenuItemDisponible, setMenuItemsDisponible } = useData()
+  const { restaurantes } = useData()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Estado local de items — independiente del store global
+  const [items, setItems] = useState<MenuItem[]>([])
+  const [loadingItems, setLoadingItems] = useState(false)
+
+  const fetchItems = useCallback(async () => {
+    if (!restId) return
+    setLoadingItems(true)
+    try {
+      const data = await api.getMenuItemsManage(restId)
+      setItems(data as MenuItem[])
+    } catch (err) {
+      console.error("Error cargando items:", err)
+    } finally {
+      setLoadingItems(false)
+    }
+  }, [restId])
+
+  useEffect(() => {
+    fetchItems()
+  }, [fetchItems])
+
   const restaurant = restaurantes.find((r) => r._id === restId)
-  const items = menuItems.filter((i) => i.restaurante_id === restId)
-  const reviews = resenas.filter((r) => r.restaurante_id === restId && r.activa)
 
   // Form state
   const [showForm, setShowForm] = useState(false)
@@ -45,9 +63,12 @@ export default function PropietarioMenu() {
   const [formData, setFormData] = useState({
     nombre: "", descripcion: "", precio: "",
     categoria: "principal" as MenuCategory,
-    etiquetas: "", imagen: DEFAULT_IMG, orden_display: 1,
+    etiquetas: "", imagen: "", orden_display: 1,
   })
-  const [imgPreview, setImgPreview] = useState<string>(DEFAULT_IMG)
+  const [imgPreview, setImgPreview] = useState<string>("")
+  const [uploadedImageId, setUploadedImageId] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   // Bulk selection state
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -62,20 +83,28 @@ export default function PropietarioMenu() {
     )
   }
 
-  // --- Image upload (mock GridFS) ---
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // --- Image upload to GridFS ---
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    // Mock GridFS: real backend → POST /api/gridfs/upload → returns imagen_id
-    const previewUrl = URL.createObjectURL(file)
-    setImgPreview(previewUrl)
-    setFormData((prev) => ({ ...prev, imagen: previewUrl }))
+    setImgPreview(URL.createObjectURL(file))
+    setUploadingImage(true)
+    try {
+      const result = await api.uploadFile(file)
+      setUploadedImageId(result.id)
+      setFormData((prev) => ({ ...prev, imagen: `/api/files/${result.id}` }))
+    } catch (err) {
+      console.error("Error subiendo imagen:", err)
+    } finally {
+      setUploadingImage(false)
+    }
   }
 
   // --- Form ---
   const resetForm = () => {
-    setFormData({ nombre: "", descripcion: "", precio: "", categoria: "principal", etiquetas: "", imagen: DEFAULT_IMG, orden_display: items.length + 1 })
-    setImgPreview(DEFAULT_IMG)
+    setFormData({ nombre: "", descripcion: "", precio: "", categoria: "principal", etiquetas: "", imagen: "", orden_display: items.length + 1 })
+    setImgPreview("")
+    setUploadedImageId(null)
     setEditingId(null)
     setShowForm(false)
   }
@@ -83,20 +112,69 @@ export default function PropietarioMenu() {
   const startEdit = (item: MenuItem) => {
     setFormData({ nombre: item.nombre, descripcion: item.descripcion, precio: item.precio.toString(), categoria: item.categoria, etiquetas: item.etiquetas.join(", "), imagen: item.imagen, orden_display: item.orden_display })
     setImgPreview(item.imagen)
+    setUploadedImageId(null)
     setEditingId(item._id)
     setShowForm(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const tags = formData.etiquetas.split(",").map((t) => t.trim()).filter(Boolean)
     const precio = parseFloat(formData.precio)
-    if (editingId) {
-      updateMenuItem(editingId, { nombre: formData.nombre, descripcion: formData.descripcion, precio, categoria: formData.categoria, etiquetas: tags, imagen: formData.imagen, orden_display: formData.orden_display })
-    } else {
-      addMenuItem({ restaurante_id: restId!, nombre: formData.nombre, descripcion: formData.descripcion, precio, categoria: formData.categoria, etiquetas: tags, imagen: formData.imagen, disponible: true, orden_display: formData.orden_display })
+    const imageData = uploadedImageId
+      ? { imagen_id: uploadedImageId, imagen: `/api/files/${uploadedImageId}` }
+      : { imagen: formData.imagen }
+
+    setSaving(true)
+    try {
+      if (editingId) {
+        await api.updateMenuItem(editingId, {
+          nombre: formData.nombre,
+          descripcion: formData.descripcion,
+          precio,
+          categoria: formData.categoria,
+          etiquetas: tags,
+          ...imageData,
+          orden_display: formData.orden_display,
+        })
+      } else {
+        await api.createMenuItem({
+          restaurante_id: restId!,
+          nombre: formData.nombre,
+          descripcion: formData.descripcion,
+          precio,
+          categoria: formData.categoria,
+          etiquetas: tags,
+          ...imageData,
+          disponible: true,
+          orden_display: formData.orden_display,
+        })
+      }
+      await fetchItems()
+      resetForm()
+    } catch (err) {
+      console.error("Error guardando item:", err)
+    } finally {
+      setSaving(false)
     }
-    resetForm()
+  }
+
+  const handleToggleDisponible = async (item: MenuItem) => {
+    try {
+      await api.updateMenuItem(item._id, { disponible: !item.disponible })
+      await fetchItems()
+    } catch (err) {
+      console.error("Error actualizando disponibilidad:", err)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.deleteMenuItem(id)
+      await fetchItems()
+    } catch (err) {
+      console.error("Error eliminando item:", err)
+    }
   }
 
   // --- Bulk selection ---
@@ -106,13 +184,23 @@ export default function PropietarioMenu() {
   const toggleAll = () => {
     setSelected((prev) => prev.size === items.length ? new Set() : new Set(items.map((i) => i._id)))
   }
-  const handleBulkDelete = () => {
-    deleteMenuItems([...selected])
+  const handleBulkDelete = async () => {
+    try {
+      await Promise.all([...selected].map((id) => api.deleteMenuItem(id)))
+      await fetchItems()
+    } catch (err) {
+      console.error("Error en eliminación masiva:", err)
+    }
     setSelected(new Set())
     setShowBulkDeleteDialog(false)
   }
-  const handleBulkDisponible = (disponible: boolean) => {
-    setMenuItemsDisponible([...selected], disponible)
+  const handleBulkDisponible = async (disponible: boolean) => {
+    try {
+      await Promise.all([...selected].map((id) => api.updateMenuItem(id, { disponible })))
+      await fetchItems()
+    } catch (err) {
+      console.error("Error actualizando disponibilidad masiva:", err)
+    }
     setSelected(new Set())
   }
 
@@ -143,7 +231,7 @@ export default function PropietarioMenu() {
       </div>
 
       {/* Stats */}
-      <div className="mb-6 grid grid-cols-3 gap-3">
+      <div className="mb-6 grid grid-cols-2 gap-3">
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center">
           <p className="text-2xl font-bold text-primary">{items.length}</p>
           <p className="text-xs text-muted-foreground">Items en menú</p>
@@ -151,10 +239,6 @@ export default function PropietarioMenu() {
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center">
           <p className="text-2xl font-bold text-primary">{items.filter((i) => i.disponible).length}</p>
           <p className="text-xs text-muted-foreground">Disponibles</p>
-        </CardContent></Card>
-        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center">
-          <p className="text-2xl font-bold text-primary">{reviews.length}</p>
-          <p className="text-xs text-muted-foreground">Reseñas</p>
         </CardContent></Card>
       </div>
 
@@ -204,29 +288,22 @@ export default function PropietarioMenu() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              {/* Image upload (mock GridFS) */}
+              {/* Image upload */}
               <div className="flex flex-col gap-2">
                 <Label className="text-xs">Imagen del platillo</Label>
                 <div className="flex items-start gap-3">
-                  <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                  <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-muted flex items-center justify-center">
                     {imgPreview
-                      ? <img src={imgPreview} alt="Preview" className="h-full w-full object-cover" />
-                      : <div className="flex h-full items-center justify-center"><ImageIcon size={24} className="text-muted-foreground/40" /></div>
+                      ? <img src={imgPreview} alt="Preview" className="h-full w-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />
+                      : <ImageIcon size={24} className="text-muted-foreground/40" />
                     }
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-                    <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => fileInputRef.current?.click()}>
-                      <Upload size={14} /> Subir imagen
+                    <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}>
+                      {uploadingImage ? <><Loader2 size={14} className="animate-spin" /> Subiendo...</> : <><Upload size={14} /> Subir imagen</>}
                     </Button>
-                    <p className="text-[10px] text-muted-foreground">Mock GridFS: en el backend se guarda el ObjectId en imagen_id.</p>
-                    <p className="text-[10px] text-muted-foreground">O pega una URL:</p>
-                    <Input
-                      value={formData.imagen}
-                      onChange={(e) => { setFormData({ ...formData, imagen: e.target.value }); setImgPreview(e.target.value) }}
-                      placeholder="https://..."
-                      className="h-7 text-xs"
-                    />
+                    {uploadedImageId && <p className="text-[10px] text-emerald-600">✓ Imagen subida correctamente</p>}
                   </div>
                 </div>
               </div>
@@ -269,8 +346,8 @@ export default function PropietarioMenu() {
                 </div>
               </div>
 
-              <Button type="submit" className="mt-1">
-                <Save size={16} /> {editingId ? "Guardar Cambios" : "Agregar al Menú"}
+              <Button type="submit" className="mt-1" disabled={uploadingImage || saving}>
+                {saving ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : <><Save size={16} /> {editingId ? "Guardar Cambios" : "Agregar al Menú"}</>}
               </Button>
             </form>
           </CardContent>
@@ -278,7 +355,11 @@ export default function PropietarioMenu() {
       )}
 
       {/* Menu items list */}
-      {Object.keys(groupedItems).length === 0 ? (
+      {loadingItems ? (
+        <div className="flex justify-center py-12">
+          <Loader2 size={32} className="animate-spin text-muted-foreground" />
+        </div>
+      ) : Object.keys(groupedItems).length === 0 ? (
         <p className="py-8 text-center text-muted-foreground">No hay items en el menú. Agrega el primero.</p>
       ) : (
         Object.entries(groupedItems).map(([cat, catItems]) => (
@@ -295,7 +376,16 @@ export default function PropietarioMenu() {
                       onCheckedChange={() => toggleSelect(item._id)}
                       className="flex-shrink-0"
                     />
-                    <img src={item.imagen} alt={item.nombre} className="h-16 w-16 rounded-lg object-cover flex-shrink-0" />
+                    <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                      {item.imagen && (
+                        <img
+                          src={item.imagen}
+                          alt={item.nombre}
+                          className="h-full w-full object-cover"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
+                        />
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-foreground truncate">{item.nombre}</p>
@@ -306,11 +396,10 @@ export default function PropietarioMenu() {
                         <span className="font-semibold text-primary">Q{item.precio.toFixed(2)}</span>
                         {item.etiquetas.map((t) => <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>)}
                         <span className="text-[10px] text-muted-foreground">{item.veces_ordenado} pedidos</span>
-                        <span className="text-[10px] text-muted-foreground">orden: {item.orden_display}</span>
                       </div>
                     </div>
                     <div className="flex gap-1 flex-shrink-0">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleMenuItemDisponible(item._id)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleToggleDisponible(item)}>
                         {item.disponible
                           ? <Eye size={14} className="text-emerald-500" />
                           : <EyeOff size={14} className="text-muted-foreground" />}
@@ -318,7 +407,7 @@ export default function PropietarioMenu() {
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(item)}>
                         <Pencil size={14} />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMenuItem(item._id)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(item._id)}>
                         <Trash2 size={14} />
                       </Button>
                     </div>
@@ -328,27 +417,6 @@ export default function PropietarioMenu() {
             </div>
           </div>
         ))
-      )}
-
-      {/* Recent reviews */}
-      {reviews.length > 0 && (
-        <div className="mt-8">
-          <h2 className="mb-4 text-lg font-semibold text-foreground">Reseñas Recientes</h2>
-          <div className="flex flex-col gap-3">
-            {reviews.slice(0, 5).map((r) => (
-              <Card key={r._id} className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <StarRating value={r.calificacion} readOnly size={14} />
-                    <span className="text-sm font-medium text-foreground">{r.titulo}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{r.comentario}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{new Date(r.fecha).toLocaleDateString("es-GT")}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
       )}
 
       {/* Bulk delete confirm */}

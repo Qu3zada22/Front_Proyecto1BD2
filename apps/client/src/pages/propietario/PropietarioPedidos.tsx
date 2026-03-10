@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ChevronRight, Filter } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -24,11 +24,16 @@ const NEXT_STATUS_LABEL: Record<string, string> = {
 
 export default function PropietarioPedidos() {
   const { user } = useAuth()
-  const { restaurantes, ordenes, advanceOrderStatus, cancelOrder } = useData()
+  const { restaurantes, ordenes, loadOrdenesPropietario, advanceOrderStatus, cancelOrder } = useData()
   const [filterStatus, setFilterStatus] = useState<EstadoOrden | "todos">("todos")
 
   const myRestaurants = restaurantes.filter((r) => r.propietario_id === user?._id)
   const myRestIds = myRestaurants.map((r) => r._id)
+
+  useEffect(() => {
+    if (myRestIds.length > 0) loadOrdenesPropietario(myRestIds)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myRestIds.join(",")])
   const myOrders = ordenes
     .filter((o) => myRestIds.includes(o.restaurante_id))
     .filter((o) => filterStatus === "todos" || o.estado === filterStatus)

@@ -15,6 +15,13 @@ export class ResenasController {
         return this.resenasService.create(dto);
     }
 
+    @Get('user/:userId')
+    @ApiOperation({ summary: 'Reseñas de un usuario', description: 'Retorna todas las reseñas activas de un cliente ordenadas por fecha.' })
+    @ApiParam({ name: 'userId', description: 'ObjectId del usuario' })
+    findByUser(@Param('userId', ParseMongoIdPipe) userId: string) {
+        return this.resenasService.findByUser(userId);
+    }
+
     @Get('restaurant/:id')
     @ApiOperation({ summary: 'Reseñas de un restaurante', description: 'Filtra activa:true. Usa índice restaurante_id + calificacion.' })
     @ApiParam({ name: 'id', description: 'ObjectId del restaurante' })

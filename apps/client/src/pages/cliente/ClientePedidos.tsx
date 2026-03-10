@@ -31,8 +31,7 @@ export default function ClientePedidos() {
   const [comentario, setComentario] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
 
-  const myOrders = ordenes
-    .filter((o) => o.usuario_id === user?._id)
+  const myOrders = [...ordenes]
     .sort((a, b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime())
 
   const handleCancel = () => {
@@ -58,8 +57,8 @@ export default function ClientePedidos() {
       restaurante_id: orden.restaurante_id,
       orden_id: orden._id,
       calificacion: rating,
-      titulo,
-      comentario,
+      ...(titulo.trim() && { titulo: titulo.trim() }),
+      ...(comentario.trim() && { comentario: comentario.trim() }),
       tags: selectedTags,
     })
     setReviewOrderId(null)

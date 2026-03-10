@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useParams, Link } from "react-router-dom"
 import { ArrowLeft, MapPin, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import { StarRating } from "@/components/fastpochi/star-rating"
 import { OrderStatusBadge } from "@/components/fastpochi/status-badge"
 import { PreferenceTags } from "@/components/fastpochi/preference-tags"
 import { useAuth, useData } from "@/lib/store"
+import { api } from "@/lib/api"
 import { REVIEW_TAGS } from "@/lib/mock-data"
 
 export default function ClientePedidoTracking() {
@@ -23,9 +24,26 @@ export default function ClientePedidoTracking() {
   const [titulo, setTitulo] = useState("")
   const [comentario, setComentario] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [ordenApi, setOrdenApi] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  const orden = ordenes.find((o) => o._id === id)
+  const ordenFromStore = ordenes.find((o) => o._id === id)
+
+  useEffect(() => {
+    if (ordenFromStore) { setLoading(false); return }
+    if (!id) return
+    api.getOrder(id)
+      .then((data) => setOrdenApi(data))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [id, ordenFromStore])
+
+  const orden = ordenFromStore ?? ordenApi
   const restaurante = restaurantes.find((r) => r._id === orden?.restaurante_id)
+
+  if (loading) {
+    return <div className="p-8 text-center text-muted-foreground">Cargando pedido...</div>
+  }
 
   if (!orden || !restaurante) {
     return <div className="p-8 text-center text-muted-foreground">Pedido no encontrado</div>

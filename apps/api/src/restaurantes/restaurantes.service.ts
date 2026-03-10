@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Connection, Model } from 'mongoose';
+import { Connection, Model, Types } from 'mongoose';
 import { Restaurante, RestauranteDocument } from './schemas/restaurante.schema';
 import { MenuItem } from '../menu-items/schemas/menu-item.schema';
 import { Orden } from '../ordenes/schemas/orden.schema';
@@ -76,8 +76,10 @@ export class RestaurantesService {
     }
 
     async update(id: string, data: any): Promise<RestauranteDocument> {
+        const patch = { ...data };
+        if (patch.img_portada_id) patch.img_portada_id = new Types.ObjectId(patch.img_portada_id);
         const updated = await this.restauranteModel
-            .findByIdAndUpdate(id, { $set: data }, { new: true })
+            .findByIdAndUpdate(id, { $set: patch }, { new: true })
             .exec();
         if (!updated) throw new NotFoundException('Restaurante no encontrado');
         return updated;

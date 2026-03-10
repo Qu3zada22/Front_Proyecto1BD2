@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { Link } from "react-router-dom"
 import { Plus, ShoppingBag, Pencil, UtensilsCrossed } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -8,10 +9,16 @@ import { useAuth, useData } from "@/lib/store"
 
 export default function PropietarioDashboard() {
   const { user } = useAuth()
-  const { restaurantes, ordenes } = useData()
+  const { restaurantes, ordenes, loadOrdenesPropietario } = useData()
 
   const myRestaurantes = restaurantes.filter((r) => r.propietario_id === user?._id)
   const myRestIds = myRestaurantes.map((r) => r._id)
+
+  useEffect(() => {
+    if (myRestIds.length > 0) loadOrdenesPropietario(myRestIds)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myRestIds.join(",")])
+
   const myOrders = ordenes.filter((o) => myRestIds.includes(o.restaurante_id))
   const todayOrders = myOrders.filter((o) => new Date(o.fecha_creacion).toDateString() === new Date().toDateString())
   const totalRevenue = myOrders.filter((o) => o.estado === "entregado").reduce((sum, o) => sum + o.total, 0)
@@ -57,12 +64,15 @@ export default function PropietarioDashboard() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {myRestaurantes.map((r) => (
             <Card key={r._id} className="group overflow-hidden border-0 shadow-sm transition-all hover:shadow-lg">
-              <div className="relative h-40 w-full overflow-hidden">
-                <img
-                  src={r.img_portada}
-                  alt={r.nombre}
-                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
+              <div className="relative h-40 w-full overflow-hidden bg-gradient-to-br from-primary/20 to-primary/5">
+                {r.img_portada && (
+                  <img
+                    src={r.img_portada}
+                    alt={r.nombre}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
+                  />
+                )}
                 {!r.activo && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                     <Badge variant="destructive">Inactivo</Badge>

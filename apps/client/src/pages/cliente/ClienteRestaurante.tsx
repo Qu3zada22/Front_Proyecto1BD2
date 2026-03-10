@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { useParams, Link } from "react-router-dom"
 import { ArrowLeft, Plus, Minus, ShoppingCart, Clock, MapPin, ThumbsUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -7,7 +7,10 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StarRating } from "@/components/fastpochi/star-rating"
 import { useData, useCart, useAuth } from "@/lib/store"
+import { api } from "@/lib/api"
 import type { MenuItem } from "@/lib/mock-data"
+
+const PAGE_SIZE = 10
 
 const CATEGORY_LABELS: Record<string, string> = {
   entrada: "Entradas",
@@ -19,20 +22,42 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export default function ClienteRestaurante() {
   const { id } = useParams<{ id: string }>()
-  const { restaurantes, menuItems, resenas, loadMenuItems, toggleLikeResena } = useData()
+  const { restaurantes, menuItems, loadMenuItems } = useData()
   const { addItem, itemCount } = useCart()
   const { user } = useAuth()
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [resenas, setResenas] = useState<any[]>([])
+  const [skip, setSkip] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingResenas, setLoadingResenas] = useState(false)
+
+  const fetchResenas = useCallback(async (nextSkip: number) => {
+    if (!id) return
+    setLoadingResenas(true)
+    try {
+      const data = await api.getReviews(id, nextSkip, PAGE_SIZE)
+      setResenas((prev) => nextSkip === 0 ? data : [...prev, ...data])
+      setHasMore(data.length === PAGE_SIZE)
+      setSkip(nextSkip + data.length)
+    } catch (err) {
+      console.error("Error cargando reseñas:", err)
+    } finally {
+      setLoadingResenas(false)
+    }
+  }, [id])
 
   useEffect(() => {
-    if (id) loadMenuItems(id)
-  }, [id, loadMenuItems])
+    if (id) {
+      loadMenuItems(id)
+      setResenas([])
+      setSkip(0)
+      setHasMore(true)
+      fetchResenas(0)
+    }
+  }, [id, loadMenuItems, fetchResenas])
 
   const restaurant = restaurantes.find((r) => r._id === id)
   const items = menuItems.filter((mi) => mi.restaurante_id === id && mi.disponible)
-  const restaurantResenas = resenas
-    .filter((re) => re.restaurante_id === id && re.activa)
-    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
 
   const categories = useMemo(() => {
     const cats = [...new Set(items.map((i) => i.categoria))]
@@ -57,8 +82,15 @@ export default function ClienteRestaurante() {
   return (
     <div className="mx-auto max-w-6xl">
       {/* Banner */}
-      <div className="relative h-56 w-full overflow-hidden md:h-72">
-        <img src={restaurant.img_portada} alt={restaurant.nombre} className="h-full w-full object-cover" />
+      <div className="relative h-56 w-full overflow-hidden bg-gradient-to-br from-primary/30 to-primary/10 md:h-72">
+        {restaurant.img_portada && (
+          <img
+            src={restaurant.img_portada}
+            alt={restaurant.nombre}
+            className="h-full w-full object-cover"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6">
           <Link to="/cliente" className="mb-3 inline-flex items-center gap-1 text-sm text-white/80 hover:text-white">
@@ -82,7 +114,7 @@ export default function ClienteRestaurante() {
         <Tabs defaultValue="menu">
           <TabsList className="mb-6">
             <TabsTrigger value="menu">Menú</TabsTrigger>
-            <TabsTrigger value="resenas">Reseñas ({restaurantResenas.length})</TabsTrigger>
+            <TabsTrigger value="resenas">Reseñas ({restaurant.total_resenas})</TabsTrigger>
           </TabsList>
 
           {/* Menu tab */}
@@ -104,7 +136,16 @@ export default function ClienteRestaurante() {
                         return (
                           <Card key={mi._id} className="overflow-hidden border-0 shadow-sm">
                             <div className="flex">
-                              <img src={mi.imagen} alt={mi.nombre} className="h-32 w-32 flex-shrink-0 object-cover" />
+                              <div className="h-32 w-32 flex-shrink-0 overflow-hidden bg-muted">
+                                {mi.imagen && (
+                                  <img
+                                    src={mi.imagen}
+                                    alt={mi.nombre}
+                                    className="h-full w-full object-cover"
+                                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
+                                  />
+                                )}
+                              </div>
                               <CardContent className="flex flex-1 flex-col justify-between p-3">
                                 <div>
                                   <h3 className="font-medium text-foreground">{mi.nombre}</h3>
@@ -150,12 +191,12 @@ export default function ClienteRestaurante() {
 
           {/* Reseñas tab */}
           <TabsContent value="resenas">
-            {restaurantResenas.length === 0 ? (
+            {resenas.length === 0 && !loadingResenas ? (
               <p className="py-8 text-center text-muted-foreground">Aun no hay reseñas para este restaurante.</p>
             ) : (
               <div className="flex flex-col gap-4">
-                {restaurantResenas.map((re) => {
-                  const autor = (re as any).cliente_id
+                {resenas.map((re) => {
+                  const autor = re.usuario_nombre
                   const hasLiked = user ? re.likes.includes(user._id) : false
                   return (
                     <Card key={re._id} className="border-0 shadow-sm">
@@ -167,29 +208,24 @@ export default function ClienteRestaurante() {
                               <span className="text-sm font-medium text-foreground">{re.titulo}</span>
                             </div>
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                              {(autor as any)?.nombre || "Usuario"} · {new Date(re.fecha || (re as any).createdAt).toLocaleDateString("es-GT", { year: "numeric", month: "short", day: "numeric" })}
+                              {autor || "Usuario"} · {new Date(re.fecha || re.createdAt).toLocaleDateString("es-GT", { year: "numeric", month: "short", day: "numeric" })}
                             </p>
                             {re.comentario && (
                               <p className="mt-2 text-sm text-foreground">{re.comentario}</p>
                             )}
                             {re.tags.length > 0 && (
                               <div className="mt-2 flex flex-wrap gap-1">
-                                {re.tags.map((t) => (
+                                {re.tags.map((t: string) => (
                                   <Badge key={t} variant="secondary" className="text-[10px] capitalize">{t}</Badge>
                                 ))}
                               </div>
                             )}
                           </div>
                           {user && user._id !== re.usuario_id && (
-                            <Button
-                              size="sm"
-                              variant={hasLiked ? "default" : "outline"}
-                              className="flex-shrink-0 gap-1"
-                              onClick={() => toggleLikeResena(re._id, user._id)}
-                            >
+                            <div className="flex items-center gap-1 text-muted-foreground text-sm flex-shrink-0">
                               <ThumbsUp size={14} />
                               <span>{re.likes.length}</span>
-                            </Button>
+                            </div>
                           )}
                           {(user?._id === re.usuario_id || !user) && re.likes.length > 0 && (
                             <div className="flex items-center gap-1 text-muted-foreground text-sm flex-shrink-0">
@@ -202,6 +238,19 @@ export default function ClienteRestaurante() {
                     </Card>
                   )
                 })}
+                {hasMore && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled={loadingResenas}
+                    onClick={() => fetchResenas(skip)}
+                  >
+                    {loadingResenas ? "Cargando..." : "Ver más reseñas"}
+                  </Button>
+                )}
+                {!hasMore && resenas.length > 0 && (
+                  <p className="text-center text-xs text-muted-foreground">No hay más reseñas</p>
+                )}
               </div>
             )}
           </TabsContent>

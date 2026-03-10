@@ -14,9 +14,24 @@ export class MenuItemsService {
     ) { }
 
     async create(dto: CreateMenuItemDto): Promise<MenuItemDocument> {
-        const restExists = await this.restauranteModel.countDocuments({ _id: dto.restaurante_id, activo: true });
+        const restauranteOid = new Types.ObjectId(dto.restaurante_id);
+        const restExists = await this.restauranteModel.countDocuments({ _id: restauranteOid, activo: true });
         if (!restExists) throw new BadRequestException('El restaurante referenciado no existe o está inactivo');
-        return this.menuItemModel.create(dto);
+
+        const doc: any = {
+            restaurante_id: restauranteOid,
+            nombre: dto.nombre,
+            precio: dto.precio,
+            categoria: dto.categoria,
+        };
+        if (dto.descripcion !== undefined) doc.descripcion = dto.descripcion;
+        if (dto.etiquetas !== undefined) doc.etiquetas = dto.etiquetas;
+        if (dto.imagen !== undefined) doc.imagen = dto.imagen;
+        if (dto.imagen_id !== undefined) doc.imagen_id = new Types.ObjectId(dto.imagen_id);
+        if (dto.disponible !== undefined) doc.disponible = dto.disponible;
+        if (dto.orden_display !== undefined) doc.orden_display = dto.orden_display;
+
+        return this.menuItemModel.create(doc);
     }
 
     async findAll(query: {
@@ -28,8 +43,7 @@ export class MenuItemsService {
         limit?: number;
     }): Promise<MenuItemDocument[]> {
         const filter: any = {};
-        // Por defecto mostrar solo platillos disponibles; pasar disponible=false para ver todos
-        filter.disponible = query.disponible !== undefined ? query.disponible : true;
+        if (query.disponible !== undefined) filter.disponible = query.disponible;
         if (query.restaurante_id) filter.restaurante_id = new Types.ObjectId(query.restaurante_id);
         if (query.categoria) filter.categoria = query.categoria;
         if (query.etiqueta) filter.etiquetas = query.etiqueta;
@@ -50,8 +64,10 @@ export class MenuItemsService {
     }
 
     async update(id: string, dto: UpdateMenuItemDto): Promise<MenuItemDocument> {
+        const patch: any = { ...dto };
+        if (dto.imagen_id) patch.imagen_id = new Types.ObjectId(dto.imagen_id);
         const updated = await this.menuItemModel
-            .findByIdAndUpdate(id, { $set: dto }, { new: true })
+            .findByIdAndUpdate(id, { $set: patch }, { new: true })
             .exec();
         if (!updated) throw new NotFoundException('Item no encontrado');
         return updated;
