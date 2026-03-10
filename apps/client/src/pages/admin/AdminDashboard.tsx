@@ -1,101 +1,133 @@
-import { useMemo } from "react"
-import { Users, Store, ShoppingBag, Tag } from "lucide-react"
+"use client"
+
+import { useMemo, useState, useEffect } from "react"
+import { Users, Store, ShoppingBag, Tag, Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { StarRating } from "@/components/fastpochi/star-rating"
-import { useData } from "@/lib/store"
+import { Button } from "@/components/ui/button"
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+interface TopRestaurante {
+  nombre: string
+  categorias: string[]
+  avg_calificacion: number
+  cantidad_resenas: number
+}
+
+interface TopPlatillo {
+  _id: string
+  nombre: string
+  total_vendidos: number
+  ingresos: number
+}
+
+interface IngresoMes {
+  periodo: string
+  restaurante: string
+  total_ingresos: number
+  total_ordenes: number
+  ticket_promedio: number
+}
+
+interface TopUsuario {
+  usuario: { nombre: string; email: string }
+  total_gastado: number
+  total_ordenes: number
+}
+
+// ── Hook ───────────────────────────────────────────────────────────────────────
+// Los endpoints devuelven { success: true, data: [...] }
+// así que extraemos .data automáticamente
+
+function useFetch<T>(url: string, defaultValue: T) {
+  const [data, setData]       = useState<T>(defaultValue)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((json) => {
+        // Soporta tanto { success, data } como respuesta directa
+        setData(json?.data ?? json)
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [url])
+
+  return { data, loading, error }
+}
+
+// ── Skeleton / Error ───────────────────────────────────────────────────────────
+
+function TableSkeleton({ cols, rows = 5 }: { cols: number; rows?: number }) {
+  return (
+    <tbody>
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={i} className="border-b last:border-0">
+          {Array.from({ length: cols }).map((_, j) => (
+            <td key={j} className="py-3 pr-4">
+              <div className="h-4 rounded bg-muted animate-pulse" />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  )
+}
+
+function TableError({ cols, message }: { cols: number; message: string }) {
+  return (
+    <tbody>
+      <tr>
+        <td colSpan={cols} className="py-6 text-center text-destructive text-sm">
+          Error: {message}
+        </td>
+      </tr>
+    </tbody>
+  )
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
-  const { adminUsers, restaurantes, ordenes, resenas } = useData()
+  // Pipelines complejas — prefijo /api/
+  const topRest  = useFetch<TopRestaurante[]>('/api/reports/restaurants/top-rated?limit=10', [])
+  const topPlat  = useFetch<TopPlatillo[]>('/api/reports/menu-items/best-sellers?limit=10', [])
+  const ingresos = useFetch<IngresoMes[]>('/api/reports/revenue/by-restaurant-month', [])
+  const topUsers = useFetch<TopUsuario[]>('/api/reports/users/top-spenders?limit=10', [])
 
-  // ── Agregaciones simples — GET /admin/stats ────────────────────────────────
-  const activeUsers      = adminUsers.filter((u) => u.activo).length
-  const activeRestaurants = restaurantes.filter((r) => r.activo).length
-  const todayOrders      = useMemo(() => {
-    const today = new Date().toDateString()
-    return ordenes.filter((o) => new Date(o.fecha_creacion).toDateString() === today).length
-  }, [ordenes])
-  const distinctCategories = useMemo(() =>
-    new Set(restaurantes.filter((r) => r.activo).flatMap((r) => r.categorias)).size
-  , [restaurantes])
+  // Agregaciones simples
+  const { data: ordenesPorEstado } = useFetch<{ estado: string; total: number }[]>('/api/reports/orders/by-status', [])
+  const { data: totalOrdenesData } = useFetch<{ total: number }>('/api/reports/orders/count', { total: 0 })
+  const { data: categorias }       = useFetch<string[]>('/api/reports/restaurants/categories/distinct', [])
+  const { data: usuariosPorRol }   = useFetch<{ rol: string; total: number }[]>('/api/reports/users/by-role', [])
+
+  const activeUsers     = useMemo(() => usuariosPorRol.reduce((s, r) => s + r.total, 0), [usuariosPorRol])
+  const totalOrdenes    = totalOrdenesData?.total ?? 0
+  const totalCategorias = categorias.length
 
   const stats = [
-    { label: "Usuarios Activos",       value: activeUsers,         icon: Users,       color: "text-primary",     bg: "bg-primary/10" },
-    { label: "Restaurantes Activos",   value: activeRestaurants,   icon: Store,       color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Órdenes Hoy",            value: todayOrders,         icon: ShoppingBag, color: "text-amber-500",   bg: "bg-amber-500/10" },
-    { label: "Categorías Disponibles", value: distinctCategories,  icon: Tag,         color: "text-violet-500",  bg: "bg-violet-500/10" },
+    { label: "Usuarios Activos",        value: activeUsers,           icon: Users,       color: "text-primary",     bg: "bg-primary/10" },
+    { label: "Restaurantes c/ Reseñas", value: topRest.data.length,   icon: Store,       color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Total de Órdenes",        value: totalOrdenes,          icon: ShoppingBag, color: "text-amber-500",   bg: "bg-amber-500/10" },
+    { label: "Categorías Disponibles",  value: totalCategorias,       icon: Tag,         color: "text-violet-500",  bg: "bg-violet-500/10" },
   ]
-
-  // ── Pipeline 1: Top Restaurantes por Calificación ─────────────────────────
-  const topRestaurantes = useMemo(() => {
-    const grouped: Record<string, { sum: number; count: number }> = {}
-    resenas.filter((r) => r.activa && r.restaurante_id).forEach((r) => {
-      if (!grouped[r.restaurante_id!]) grouped[r.restaurante_id!] = { sum: 0, count: 0 }
-      grouped[r.restaurante_id!].sum += r.calificacion
-      grouped[r.restaurante_id!].count++
-    })
-    return Object.entries(grouped)
-      .filter(([, g]) => g.count >= 1)
-      .map(([id, g]) => {
-        const rest = restaurantes.find((r) => r._id === id)
-        return { nombre: rest?.nombre || id, categorias: rest?.categorias || [], promedio: Math.round((g.sum / g.count) * 10) / 10, total_resenas: g.count }
-      })
-      .sort((a, b) => b.promedio - a.promedio)
-      .slice(0, 10)
-  }, [resenas, restaurantes])
-
-  // ── Pipeline 2: Platillos Más Vendidos ────────────────────────────────────
-  const topPlatillos = useMemo(() => {
-    const grouped: Record<string, { nombre: string; total_vendido: number; ingresos: number }> = {}
-    ordenes.filter((o) => o.estado === "entregado").forEach((o) => {
-      o.items.forEach((item) => {
-        if (!grouped[item.item_id]) grouped[item.item_id] = { nombre: item.nombre, total_vendido: 0, ingresos: 0 }
-        grouped[item.item_id].total_vendido += item.cantidad
-        grouped[item.item_id].ingresos += item.subtotal
-      })
-    })
-    return Object.values(grouped).sort((a, b) => b.total_vendido - a.total_vendido).slice(0, 10)
-  }, [ordenes])
-
-  // ── Pipeline 3: Ingresos por Restaurante por Mes ──────────────────────────
-  const ingresosMes = useMemo(() => {
-    const grouped: Record<string, { restaurante_id: string; total: number }> = {}
-    ordenes.filter((o) => o.estado === "entregado").forEach((o) => {
-      const d = new Date(o.fecha_creacion)
-      const key = `${o.restaurante_id}__${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-      if (!grouped[key]) grouped[key] = { restaurante_id: o.restaurante_id, total: 0 }
-      grouped[key].total += o.total
-    })
-    return Object.entries(grouped)
-      .map(([key, data]) => {
-        const periodo = key.split("__")[1]
-        const rest = restaurantes.find((r) => r._id === data.restaurante_id)
-        return { periodo, nombre: rest?.nombre || data.restaurante_id, total: data.total }
-      })
-      .sort((a, b) => b.periodo.localeCompare(a.periodo))
-  }, [ordenes, restaurantes])
-
-  // ── Pipeline 4: Usuarios con Mayor Gasto ─────────────────────────────────
-  const topUsuarios = useMemo(() => {
-    const grouped: Record<string, number> = {}
-    ordenes.filter((o) => o.estado === "entregado").forEach((o) => {
-      grouped[o.usuario_id] = (grouped[o.usuario_id] || 0) + o.total
-    })
-    return Object.entries(grouped)
-      .map(([userId, gasto]) => {
-        const u = adminUsers.find((u) => u._id === userId)
-        return { nombre: u?.nombre || userId, email: u?.email || "", rol: u?.rol || "", gasto }
-      })
-      .sort((a, b) => b.gasto - a.gasto)
-      .slice(0, 10)
-  }, [ordenes, adminUsers])
+const [verMasIngresos, setVerMasIngresos] = useState(5)
 
   return (
     <div>
       <h1 className="mb-2 text-2xl font-bold text-foreground">Dashboard Administrativo</h1>
       <p className="mb-8 text-sm text-muted-foreground">Métricas del sistema y resultados de aggregation pipelines.</p>
 
-      {/* KPIs — Agregaciones simples */}
+      {/* KPIs */}
       <section className="mb-10">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Agregaciones Simples</h2>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -115,7 +147,7 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {/* Pipelines complejas */}
+      {/* Pipelines */}
       <section>
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Aggregation Pipelines Complejas</h2>
         <div className="flex flex-col gap-6">
@@ -138,29 +170,29 @@ export default function AdminDashboard() {
                       <th className="pb-3 font-medium text-muted-foreground text-center">Reseñas</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {topRestaurantes.map((r, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-3 pr-4 font-bold text-muted-foreground">{i + 1}</td>
-                        <td className="py-3 pr-4 font-medium text-foreground">{r.nombre}</td>
-                        <td className="py-3 pr-4">
-                          <div className="flex flex-wrap gap-1">
-                            {r.categorias.map((c) => <Badge key={c} variant="outline" className="text-[10px]">{c}</Badge>)}
-                          </div>
-                        </td>
-                        <td className="py-3 pr-4 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <StarRating value={r.promedio} size={13} readOnly />
-                            <span className="font-medium text-foreground">{r.promedio}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 text-center text-foreground">{r.total_resenas}</td>
-                      </tr>
-                    ))}
-                    {topRestaurantes.length === 0 && (
-                      <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">Sin datos</td></tr>
-                    )}
-                  </tbody>
+                  {topRest.loading ? <TableSkeleton cols={5} /> : topRest.error ? <TableError cols={5} message={topRest.error} /> : (
+                    <tbody>
+                      {topRest.data.map((r, i) => (
+                        <tr key={i} className="border-b last:border-0">
+                          <td className="py-3 pr-4 font-bold text-muted-foreground">{i + 1}</td>
+                          <td className="py-3 pr-4 font-medium text-foreground">{r.nombre}</td>
+                          <td className="py-3 pr-4">
+                            <div className="flex flex-wrap gap-1">
+                              {r.categorias?.map((c) => <Badge key={c} variant="outline" className="text-[10px]">{c}</Badge>)}
+                            </div>
+                          </td>
+                          <td className="py-3 pr-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <StarRating value={r.avg_calificacion} size={13} readOnly />
+                              <span className="font-medium text-foreground">{r.avg_calificacion}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 text-center text-foreground">{r.cantidad_resenas}</td>
+                        </tr>
+                      ))}
+                      {topRest.data.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">Sin datos</td></tr>}
+                    </tbody>
+                  )}
                 </table>
               </div>
             </CardContent>
@@ -183,58 +215,82 @@ export default function AdminDashboard() {
                       <th className="pb-3 font-medium text-muted-foreground text-right">Ingresos</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {topPlatillos.map((p, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-3 pr-4 font-bold text-muted-foreground">{i + 1}</td>
-                        <td className="py-3 pr-4 font-medium text-foreground">{p.nombre}</td>
-                        <td className="py-3 pr-4 text-center text-foreground">{p.total_vendido}</td>
-                        <td className="py-3 text-right font-semibold text-primary">Q{p.ingresos.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                    {topPlatillos.length === 0 && (
-                      <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">Sin datos</td></tr>
-                    )}
-                  </tbody>
+                  {topPlat.loading ? <TableSkeleton cols={4} /> : topPlat.error ? <TableError cols={4} message={topPlat.error} /> : (
+                    <tbody>
+                      {topPlat.data.map((p, i) => (
+                        <tr key={i} className="border-b last:border-0">
+                          <td className="py-3 pr-4 font-bold text-muted-foreground">{i + 1}</td>
+                          <td className="py-3 pr-4 font-medium text-foreground">{p.nombre}</td>
+                          <td className="py-3 pr-4 text-center text-foreground">{p.total_vendidos}</td>
+                          <td className="py-3 text-right font-semibold text-primary">Q{Number(p.ingresos).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                      {topPlat.data.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">Sin datos</td></tr>}
+                    </tbody>
+                  )}
                 </table>
               </div>
             </CardContent>
           </Card>
 
-          {/* Pipeline 3 */}
           <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-foreground">Ingresos por Restaurante por Mes</CardTitle>
-              <CardDescription>ordenes entregadas → $group {'{'} restaurante_id, $year, $month {'}'} → $sum $toDecimal → $sort → $lookup restaurantes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left">
-                      <th className="pb-3 pr-4 font-medium text-muted-foreground">Período</th>
-                      <th className="pb-3 pr-4 font-medium text-muted-foreground">Restaurante</th>
-                      <th className="pb-3 font-medium text-muted-foreground text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ingresosMes.map((row, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-3 pr-4">
-                          <Badge variant="secondary" className="font-mono">{row.periodo}</Badge>
-                        </td>
-                        <td className="py-3 pr-4 text-foreground">{row.nombre}</td>
-                        <td className="py-3 text-right font-semibold text-primary">Q{row.total.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                    {ingresosMes.length === 0 && (
-                      <tr><td colSpan={3} className="py-6 text-center text-muted-foreground">Sin datos</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+  <CardHeader>
+    <CardTitle className="text-foreground">Ingresos por Restaurante por Mes</CardTitle>
+    <CardDescription>ordenes entregadas → $group {'{'} restaurante_id, $year, $month {'}'} → $sum $toDecimal → $sort → $lookup restaurantes</CardDescription>
+  </CardHeader>
+  <CardContent>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b text-left">
+            <th className="pb-3 pr-4 font-medium text-muted-foreground">Período</th>
+            <th className="pb-3 pr-4 font-medium text-muted-foreground">Restaurante</th>
+            <th className="pb-3 pr-4 font-medium text-muted-foreground text-center">Órdenes</th>
+            <th className="pb-3 pr-4 font-medium text-muted-foreground text-right">Ticket Prom.</th>
+            <th className="pb-3 font-medium text-muted-foreground text-right">Total</th>
+          </tr>
+        </thead>
+        {ingresos.loading ? <TableSkeleton cols={5} /> : ingresos.error ? <TableError cols={5} message={ingresos.error} /> : (
+          <tbody>
+            {ingresos.data.slice(0, verMasIngresos).map((row, i) => (
+              <tr key={i} className="border-b last:border-0">
+                <td className="py-3 pr-4">
+                  <Badge variant="secondary" className="font-mono">{row.periodo}</Badge>
+                </td>
+                <td className="py-3 pr-4 text-foreground">{row.restaurante}</td>
+                <td className="py-3 pr-4 text-center text-foreground">{row.total_ordenes}</td>
+                <td className="py-3 pr-4 text-right text-muted-foreground">Q{Number(row.ticket_promedio).toFixed(2)}</td>
+                <td className="py-3 text-right font-semibold text-primary">Q{Number(row.total_ingresos).toFixed(2)}</td>
+              </tr>
+            ))}
+            {ingresos.data.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">Sin datos</td></tr>}
+          </tbody>
+        )}
+      </table>
+    </div>
+
+    {/* Botones Ver más / Ver menos */}
+    {!ingresos.loading && !ingresos.error && ingresos.data.length > 5 && (
+      <div className="mt-4 flex items-center justify-between border-t pt-4">
+        <p className="text-xs text-muted-foreground">
+          Mostrando {Math.min(verMasIngresos, ingresos.data.length)} de {ingresos.data.length} registros
+        </p>
+        <div className="flex gap-2">
+          {verMasIngresos < ingresos.data.length && (
+            <Button variant="outline" size="sm" onClick={() => setVerMasIngresos((v) => v + 10)}>
+              Ver 10 más
+            </Button>
+          )}
+          {verMasIngresos > 5 && (
+            <Button variant="ghost" size="sm" onClick={() => setVerMasIngresos(5)}>
+              Colapsar
+            </Button>
+          )}
+        </div>
+      </div>
+    )}
+  </CardContent>
+</Card>
 
           {/* Pipeline 4 */}
           <Card className="border-0 shadow-sm">
@@ -250,26 +306,24 @@ export default function AdminDashboard() {
                       <th className="pb-3 pr-4 font-medium text-muted-foreground">#</th>
                       <th className="pb-3 pr-4 font-medium text-muted-foreground">Usuario</th>
                       <th className="pb-3 pr-4 font-medium text-muted-foreground">Email</th>
-                      <th className="pb-3 pr-4 font-medium text-muted-foreground text-center">Rol</th>
+                      <th className="pb-3 pr-4 font-medium text-muted-foreground text-center">Órdenes</th>
                       <th className="pb-3 font-medium text-muted-foreground text-right">Gasto Total</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {topUsuarios.map((u, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-3 pr-4 font-bold text-muted-foreground">{i + 1}</td>
-                        <td className="py-3 pr-4 font-medium text-foreground">{u.nombre}</td>
-                        <td className="py-3 pr-4 text-muted-foreground">{u.email}</td>
-                        <td className="py-3 pr-4 text-center">
-                          <Badge variant="outline" className="text-[10px] capitalize">{u.rol}</Badge>
-                        </td>
-                        <td className="py-3 text-right font-semibold text-primary">Q{u.gasto.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                    {topUsuarios.length === 0 && (
-                      <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">Sin datos</td></tr>
-                    )}
-                  </tbody>
+                  {topUsers.loading ? <TableSkeleton cols={5} /> : topUsers.error ? <TableError cols={5} message={topUsers.error} /> : (
+                    <tbody>
+                      {topUsers.data.map((u, i) => (
+                        <tr key={i} className="border-b last:border-0">
+                          <td className="py-3 pr-4 font-bold text-muted-foreground">{i + 1}</td>
+                          <td className="py-3 pr-4 font-medium text-foreground">{u.usuario?.nombre ?? '—'}</td>
+                          <td className="py-3 pr-4 text-muted-foreground">{u.usuario?.email ?? '—'}</td>
+                          <td className="py-3 pr-4 text-center text-foreground">{u.total_ordenes}</td>
+                          <td className="py-3 text-right font-semibold text-primary">Q{Number(u.total_gastado).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                      {topUsers.data.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">Sin datos</td></tr>}
+                    </tbody>
+                  )}
                 </table>
               </div>
             </CardContent>
