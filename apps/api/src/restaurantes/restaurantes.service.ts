@@ -87,15 +87,16 @@ export class RestaurantesService {
     return restaurante;
   }
 
-    async update(id: string, data: any): Promise<RestauranteDocument> {
-        const patch = { ...data };
-        if (patch.img_portada_id) patch.img_portada_id = new Types.ObjectId(patch.img_portada_id);
-        const updated = await this.restauranteModel
-            .findByIdAndUpdate(id, { $set: patch }, { new: true })
-            .exec();
-        if (!updated) throw new NotFoundException('Restaurante no encontrado');
-        return updated;
-    }
+  async update(id: string, data: any): Promise<RestauranteDocument> {
+    const patch = { ...data };
+    if (patch.img_portada_id)
+      patch.img_portada_id = new Types.ObjectId(patch.img_portada_id);
+    const updated = await this.restauranteModel
+      .findByIdAndUpdate(id, { $set: patch }, { new: true })
+      .exec();
+    if (!updated) throw new NotFoundException('Restaurante no encontrado');
+    return updated;
+  }
 
   async remove(id: string): Promise<{ deleted: boolean }> {
     const [ordenesCount, menuItemsCount] = await Promise.all([

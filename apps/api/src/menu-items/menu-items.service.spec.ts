@@ -81,7 +81,14 @@ describe('MenuItemsService', () => {
 
       const result = await service.create(dto as any);
 
-      expect(mockModel.create).toHaveBeenCalledWith(dto);
+      expect(mockModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          restaurante_id: expect.any(Types.ObjectId),
+          nombre: 'Burger',
+          precio: 45,
+          categoria: 'principal',
+        }),
+      );
       expect(result).toEqual(created);
     });
 
@@ -124,14 +131,14 @@ describe('MenuItemsService', () => {
   // ── findAll ─────────────────────────────────────────────────────────────────
 
   describe('findAll', () => {
-    it('should filter by disponible:true by default when not specified', async () => {
+    it('should NOT add disponible filter by default when not specified', async () => {
       const query = createMockQuery([]);
       mockModel.find.mockReturnValue(query);
 
       await service.findAll({});
 
       const callArg = mockModel.find.mock.calls[0][0];
-      expect(callArg.disponible).toBe(true);
+      expect(callArg.disponible).toBeUndefined();
     });
 
     it('should allow overriding disponible to false', async () => {
@@ -151,9 +158,7 @@ describe('MenuItemsService', () => {
 
       const result = await service.findAll({});
 
-      expect(mockModel.find).toHaveBeenCalledWith(
-        expect.objectContaining({ disponible: true }),
-      );
+      expect(mockModel.find).toHaveBeenCalledWith({});
       expect(query.sort).toHaveBeenCalledWith({ categoria: 1, nombre: 1 });
       expect(query.skip).toHaveBeenCalledWith(0);
       expect(query.limit).toHaveBeenCalledWith(50);
