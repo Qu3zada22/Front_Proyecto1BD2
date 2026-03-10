@@ -4,14 +4,14 @@ Interfaz web del sistema de delivery de comida. Construido con **React 18**, **V
 
 ## Stack
 
-| Tecnología       | Rol                                       |
-|------------------|-------------------------------------------|
-| React 18         | UI                                        |
-| Vite 7           | Bundler y dev server                      |
-| TypeScript       | Tipado estático                           |
-| shadcn/ui        | Componentes accesibles (Radix UI)         |
-| Tailwind CSS 4   | Estilos utilitarios                       |
-| React Router     | Enrutamiento SPA                          |
+| Tecnología     | Rol                               |
+| -------------- | --------------------------------- |
+| React 18       | UI                                |
+| Vite 7         | Bundler y dev server              |
+| TypeScript     | Tipado estático                   |
+| shadcn/ui      | Componentes accesibles (Radix UI) |
+| Tailwind CSS 4 | Estilos utilitarios               |
+| React Router   | Enrutamiento SPA                  |
 
 ## Correr en desarrollo
 
@@ -52,11 +52,11 @@ src/
 
 ## Vistas por rol
 
-| Rol           | Páginas disponibles                                                |
-|---------------|--------------------------------------------------------------------|
-| `cliente`     | Home, Restaurante, Carrito, Mis pedidos, Tracking, Mis reseñas    |
-| `propietario` | Dashboard, Mis restaurantes, Menú, Pedidos recibidos              |
-| `admin`       | Dashboard, Usuarios, Restaurantes, Reseñas, Reportes              |
+| Rol           | Páginas disponibles                                            |
+| ------------- | -------------------------------------------------------------- |
+| `cliente`     | Home, Restaurante, Carrito, Mis pedidos, Tracking, Mis reseñas |
+| `propietario` | Dashboard, Mis restaurantes, Menú, Pedidos recibidos           |
+| `admin`       | Dashboard, Usuarios, Restaurantes, Reseñas, Reportes           |
 
 ## Lint
 

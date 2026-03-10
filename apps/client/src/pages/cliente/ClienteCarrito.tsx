@@ -1,36 +1,60 @@
-import { useState } from "react"
-import { useNavigate, Link } from "react-router-dom"
-import { ArrowLeft, Minus, Plus, Trash2, ShoppingCart, CheckCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { useAuth, useCart, useData } from "@/lib/store"
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  ArrowLeft,
+  Minus,
+  Plus,
+  Trash2,
+  ShoppingCart,
+  CheckCircle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { useAuth, useCart, useData } from "@/lib/store";
 
 export default function ClienteCarrito() {
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const { items, total, updateQuantity, removeItem, clearCart, restauranteId } = useCart()
-  const { restaurantes, createOrder } = useData()
-  const [notas, setNotas] = useState("")
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { items, total, updateQuantity, removeItem, clearCart, restauranteId } =
+    useCart();
+  const { restaurantes, createOrder } = useData();
+  const [notas, setNotas] = useState("");
   const [selectedDireccion, setSelectedDireccion] = useState(
-    user?.direcciones.find((d) => d.es_principal)?.alias || user?.direcciones[0]?.alias || ""
-  )
-  const [showConfirmation, setShowConfirmation] = useState(false)
-  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
-  const [orderError, setOrderError] = useState<string | null>(null)
-  const [ordering, setOrdering] = useState(false)
+    user?.direcciones.find((d) => d.es_principal)?.alias ||
+      user?.direcciones[0]?.alias ||
+      "",
+  );
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const [ordering, setOrdering] = useState(false);
 
-  const restaurante = restaurantes.find((r) => r._id === restauranteId)
+  const restaurante = restaurantes.find((r) => r._id === restauranteId);
 
   const handleConfirmOrder = async () => {
-    if (!user || items.length === 0) return
-    setOrdering(true)
-    setOrderError(null)
+    if (!user || items.length === 0) return;
+    setOrdering(true);
+    setOrderError(null);
     try {
-      const dir = user.direcciones?.find((d) => d.alias === selectedDireccion) ?? user.direcciones?.[0]
+      const dir =
+        user.direcciones?.find((d) => d.alias === selectedDireccion) ??
+        user.direcciones?.[0];
       const orderId = await createOrder({
         usuario_id: user._id,
         restaurante_id: restauranteId!,
@@ -43,42 +67,67 @@ export default function ClienteCarrito() {
         })),
         total,
         direccion_entrega: dir
-          ? { alias: dir.alias, calle: dir.calle, ciudad: dir.ciudad, pais: dir.pais }
-          : { alias: "Casa", calle: "Sin direccion", ciudad: "Guatemala", pais: "GT" },
+          ? {
+              alias: dir.alias,
+              calle: dir.calle,
+              ciudad: dir.ciudad,
+              pais: dir.pais,
+            }
+          : {
+              alias: "Casa",
+              calle: "Sin direccion",
+              ciudad: "Guatemala",
+              pais: "GT",
+            },
         notas: notas || undefined,
-      })
-      setCreatedOrderId(orderId)
-      setShowConfirmation(true)
-      clearCart()
+      });
+      setCreatedOrderId(orderId);
+      setShowConfirmation(true);
+      clearCart();
     } catch (err) {
-      setOrderError(err instanceof Error ? err.message : "Error al crear el pedido")
+      setOrderError(
+        err instanceof Error ? err.message : "Error al crear el pedido",
+      );
     } finally {
-      setOrdering(false)
+      setOrdering(false);
     }
-  }
+  };
 
   if (items.length === 0 && !showConfirmation) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <ShoppingCart size={64} className="mx-auto mb-4 text-muted-foreground/30" />
-        <h1 className="text-2xl font-bold text-foreground">Tu carrito esta vacio</h1>
-        <p className="mt-2 text-muted-foreground">Agrega platillos de un restaurante para comenzar</p>
+        <ShoppingCart
+          size={64}
+          className="mx-auto mb-4 text-muted-foreground/30"
+        />
+        <h1 className="text-2xl font-bold text-foreground">
+          Tu carrito esta vacio
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          Agrega platillos de un restaurante para comenzar
+        </p>
         <Button asChild className="mt-6">
           <Link to="/cliente">Explorar Restaurantes</Link>
         </Button>
       </div>
-    )
+    );
   }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
       <div className="mb-6 flex items-center gap-2">
         <Button variant="ghost" size="icon" asChild>
-          <Link to="/cliente"><ArrowLeft size={20} /></Link>
+          <Link to="/cliente">
+            <ArrowLeft size={20} />
+          </Link>
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-foreground">Tu Carrito</h1>
-          {restaurante && <p className="text-sm text-muted-foreground">{restaurante.nombre}</p>}
+          {restaurante && (
+            <p className="text-sm text-muted-foreground">
+              {restaurante.nombre}
+            </p>
+          )}
         </div>
       </div>
 
@@ -92,26 +141,52 @@ export default function ClienteCarrito() {
                     src={item.imagen}
                     alt={item.nombre}
                     className="h-full w-full object-cover"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display =
+                        "none";
+                    }}
                   />
                 )}
               </div>
               <div className="flex-1">
                 <h3 className="font-medium text-foreground">{item.nombre}</h3>
-                <p className="text-sm text-primary">Q{item.precio.toFixed(2)}</p>
+                <p className="text-sm text-primary">
+                  Q{item.precio.toFixed(2)}
+                </p>
               </div>
               <div className="flex items-center gap-1">
-                <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateQuantity(item.item_id, item.cantidad - 1)}>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-7 w-7"
+                  onClick={() =>
+                    updateQuantity(item.item_id, item.cantidad - 1)
+                  }
+                >
                   <Minus size={14} />
                 </Button>
-                <span className="w-8 text-center text-sm font-medium text-foreground">{item.cantidad}</span>
-                <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateQuantity(item.item_id, item.cantidad + 1)}>
+                <span className="w-8 text-center text-sm font-medium text-foreground">
+                  {item.cantidad}
+                </span>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-7 w-7"
+                  onClick={() =>
+                    updateQuantity(item.item_id, item.cantidad + 1)
+                  }
+                >
                   <Plus size={14} />
                 </Button>
               </div>
               <div className="text-right">
-                <p className="font-semibold text-foreground">Q{(item.precio * item.cantidad).toFixed(2)}</p>
-                <button onClick={() => removeItem(item.item_id)} className="mt-1 text-xs text-destructive hover:underline">
+                <p className="font-semibold text-foreground">
+                  Q{(item.precio * item.cantidad).toFixed(2)}
+                </p>
+                <button
+                  onClick={() => removeItem(item.item_id)}
+                  className="mt-1 text-xs text-destructive hover:underline"
+                >
                   <Trash2 size={12} className="inline" /> Quitar
                 </button>
               </div>
@@ -123,16 +198,27 @@ export default function ClienteCarrito() {
       <div className="mt-6 flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label>Notas para el pedido</Label>
-          <Textarea placeholder="Instrucciones especiales..." value={notas} onChange={(e) => setNotas(e.target.value)} />
+          <Textarea
+            placeholder="Instrucciones especiales..."
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+          />
         </div>
         {user && user.direcciones.length > 0 && (
           <div className="flex flex-col gap-2">
             <Label>Direccion de entrega</Label>
-            <Select value={selectedDireccion} onValueChange={setSelectedDireccion}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={selectedDireccion}
+              onValueChange={setSelectedDireccion}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {user.direcciones.map((d) => (
-                  <SelectItem key={d.alias} value={d.alias}>{d.alias} - {d.calle}</SelectItem>
+                  <SelectItem key={d.alias} value={d.alias}>
+                    {d.alias} - {d.calle}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -149,7 +235,12 @@ export default function ClienteCarrito() {
         {orderError && (
           <p className="text-sm text-destructive text-center">{orderError}</p>
         )}
-        <Button size="lg" className="w-full text-base" onClick={handleConfirmOrder} disabled={ordering}>
+        <Button
+          size="lg"
+          className="w-full text-base"
+          onClick={handleConfirmOrder}
+          disabled={ordering}
+        >
           {ordering ? "Enviando pedido..." : "Confirmar Pedido"}
         </Button>
       </div>
@@ -160,19 +251,37 @@ export default function ClienteCarrito() {
             <div className="mx-auto mb-2">
               <CheckCircle size={64} className="text-emerald-500" />
             </div>
-            <DialogTitle className="text-2xl">Tu pedido ha sido confirmado!</DialogTitle>
+            <DialogTitle className="text-2xl">
+              Tu pedido ha sido confirmado!
+            </DialogTitle>
           </DialogHeader>
-          <p className="text-muted-foreground">Tu pedido esta siendo procesado. Puedes rastrear su estado en tiempo real.</p>
+          <p className="text-muted-foreground">
+            Tu pedido esta siendo procesado. Puedes rastrear su estado en tiempo
+            real.
+          </p>
           <DialogFooter className="flex-col gap-2 sm:flex-col">
-            <Button className="w-full" onClick={() => { setShowConfirmation(false); navigate(`/cliente/pedido/${createdOrderId}`) }}>
+            <Button
+              className="w-full"
+              onClick={() => {
+                setShowConfirmation(false);
+                navigate(`/cliente/pedido/${createdOrderId}`);
+              }}
+            >
               Rastrear Pedido
             </Button>
-            <Button variant="outline" className="w-full" onClick={() => { setShowConfirmation(false); navigate("/cliente") }}>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setShowConfirmation(false);
+                navigate("/cliente");
+              }}
+            >
               Seguir Explorando
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

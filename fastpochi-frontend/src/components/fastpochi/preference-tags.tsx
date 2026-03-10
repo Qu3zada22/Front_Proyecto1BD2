@@ -1,10 +1,10 @@
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 interface PreferenceTagsProps {
-  tags: string[]
-  selected: string[]
-  onToggle: (tag: string) => void
-  className?: string
+  tags: string[];
+  selected: string[];
+  onToggle: (tag: string) => void;
+  className?: string;
 }
 
 const TAG_LABELS: Record<string, string> = {
@@ -24,13 +24,18 @@ const TAG_LABELS: Record<string, string> = {
   rapida: "Comida Rapida",
   guatemalteca: "Guatemalteca",
   gourmet: "Gourmet",
-}
+};
 
-export function PreferenceTags({ tags, selected, onToggle, className }: PreferenceTagsProps) {
+export function PreferenceTags({
+  tags,
+  selected,
+  onToggle,
+  className,
+}: PreferenceTagsProps) {
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
       {tags.map((tag) => {
-        const isSelected = selected.includes(tag)
+        const isSelected = selected.includes(tag);
         return (
           <button
             key={tag}
@@ -40,15 +45,15 @@ export function PreferenceTags({ tags, selected, onToggle, className }: Preferen
               "rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
               isSelected
                 ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-foreground hover:border-primary/50 hover:bg-primary/5"
+                : "border-border bg-card text-foreground hover:border-primary/50 hover:bg-primary/5",
             )}
           >
             {TAG_LABELS[tag] || tag}
           </button>
-        )
+        );
       })}
     </div>
-  )
+  );
 }
 
-export { TAG_LABELS }
+export { TAG_LABELS };

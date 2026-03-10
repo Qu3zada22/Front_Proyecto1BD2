@@ -1,137 +1,177 @@
-import { useState, useRef } from "react"
-import { useParams, useNavigate } from "react-router-dom"
-import { ArrowLeft, Upload, ImageIcon, Trash2, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { PreferenceTags } from "@/components/fastpochi/preference-tags"
-import { StatusBadge } from "@/components/fastpochi/status-badge"
-import { RESTAURANT_CATEGORIES } from "@/lib/mock-data"
-import type { HorarioDia } from "@/lib/mock-data"
-import { useAuth, useData } from "@/lib/store"
-import { api } from "@/lib/api"
+import { useState, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, Upload, ImageIcon, Trash2, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { PreferenceTags } from "@/components/fastpochi/preference-tags";
+import { StatusBadge } from "@/components/fastpochi/status-badge";
+import { RESTAURANT_CATEGORIES } from "@/lib/mock-data";
+import type { HorarioDia } from "@/lib/mock-data";
+import { useAuth, useData } from "@/lib/store";
+import { api } from "@/lib/api";
 
 const DIAS: { key: string; label: string }[] = [
-  { key: "lunes",     label: "Lunes"      },
-  { key: "martes",    label: "Martes"     },
-  { key: "miercoles", label: "Miércoles"  },
-  { key: "jueves",    label: "Jueves"     },
-  { key: "viernes",   label: "Viernes"    },
-  { key: "sabado",    label: "Sábado"     },
-  { key: "domingo",   label: "Domingo"    },
-]
+  { key: "lunes", label: "Lunes" },
+  { key: "martes", label: "Martes" },
+  { key: "miercoles", label: "Miércoles" },
+  { key: "jueves", label: "Jueves" },
+  { key: "viernes", label: "Viernes" },
+  { key: "sabado", label: "Sábado" },
+  { key: "domingo", label: "Domingo" },
+];
 
 export default function PropietarioEditarRestaurante() {
-  const { id: restId } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const { restaurantes, updateRestaurante, deleteRestaurante } = useData()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { id: restId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { restaurantes, updateRestaurante, deleteRestaurante } = useData();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const restaurant = restaurantes.find((r: any) => r._id === restId)
+  const restaurant = restaurantes.find((r: any) => r._id === restId);
 
-  const [nombre, setNombre] = useState(restaurant?.nombre || "")
-  const [descripcion, setDescripcion] = useState(restaurant?.descripcion || "")
-  const [calle, setCalle] = useState(restaurant?.direccion?.calle || "")
-  const [ciudad, setCiudad] = useState(restaurant?.direccion?.ciudad || "")
-  const [pais, setPais] = useState(restaurant?.direccion?.pais || "GT")
-  const [codigoPostal, setCodigoPostal] = useState(restaurant?.direccion?.codigo_postal || "")
-  const [telefono, setTelefono] = useState(restaurant?.telefono || "")
-  const [categorias, setCategorias] = useState<string[]>(restaurant?.categorias || [])
-  const [horario, setHorario] = useState<Record<string, HorarioDia>>(restaurant?.horario || {})
-  const [lat, setLat] = useState(String(restaurant?.ubicacion?.coordinates?.[1] || "14.6349"))
-  const [lng, setLng] = useState(String(restaurant?.ubicacion?.coordinates?.[0] || "-90.5069"))
-  const [imgPreview, setImgPreview] = useState<string>(restaurant?.img_portada || "")
-  const [uploadedImgId, setUploadedImgId] = useState<string | null>(null)
-  const [uploadingImg, setUploadingImg] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [nombre, setNombre] = useState(restaurant?.nombre || "");
+  const [descripcion, setDescripcion] = useState(restaurant?.descripcion || "");
+  const [calle, setCalle] = useState(restaurant?.direccion?.calle || "");
+  const [ciudad, setCiudad] = useState(restaurant?.direccion?.ciudad || "");
+  const [pais, setPais] = useState(restaurant?.direccion?.pais || "GT");
+  const [codigoPostal, setCodigoPostal] = useState(
+    restaurant?.direccion?.codigo_postal || "",
+  );
+  const [telefono, setTelefono] = useState(restaurant?.telefono || "");
+  const [categorias, setCategorias] = useState<string[]>(
+    restaurant?.categorias || [],
+  );
+  const [horario, setHorario] = useState<Record<string, HorarioDia>>(
+    restaurant?.horario || {},
+  );
+  const [lat, setLat] = useState(
+    String(restaurant?.ubicacion?.coordinates?.[1] || "14.6349"),
+  );
+  const [lng, setLng] = useState(
+    String(restaurant?.ubicacion?.coordinates?.[0] || "-90.5069"),
+  );
+  const [imgPreview, setImgPreview] = useState<string>(
+    restaurant?.img_portada || "",
+  );
+  const [uploadedImgId, setUploadedImgId] = useState<string | null>(null);
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   if (!restaurant || restaurant.propietario_id !== user?._id) {
     return (
       <div className="py-12 text-center">
         <p className="text-muted-foreground">Restaurante no encontrado</p>
-        <Button variant="ghost" className="mt-2" onClick={() => navigate("/propietario")}>Volver</Button>
+        <Button
+          variant="ghost"
+          className="mt-2"
+          onClick={() => navigate("/propietario")}
+        >
+          Volver
+        </Button>
       </div>
-    )
+    );
   }
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImgPreview(URL.createObjectURL(file))
-    setUploadingImg(true)
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImgPreview(URL.createObjectURL(file));
+    setUploadingImg(true);
     try {
-      const result = await api.uploadFile(file)
-      setUploadedImgId(result.id)
+      const result = await api.uploadFile(file);
+      setUploadedImgId(result.id);
     } catch (err) {
-      console.error("Error subiendo imagen:", err)
+      console.error("Error subiendo imagen:", err);
     } finally {
-      setUploadingImg(false)
+      setUploadingImg(false);
     }
-  }
+  };
 
-  const updateDia = (dia: string, field: keyof HorarioDia, value: string | boolean) => {
-    setHorario((prev) => ({ ...prev, [dia]: { ...prev[dia], [field]: value } }))
-  }
+  const updateDia = (
+    dia: string,
+    field: keyof HorarioDia,
+    value: string | boolean,
+  ) => {
+    setHorario((prev) => ({
+      ...prev,
+      [dia]: { ...prev[dia], [field]: value },
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (categorias.length === 0) return
-    setSaving(true)
+    e.preventDefault();
+    if (categorias.length === 0) return;
+    setSaving(true);
     try {
       const patch: any = {
         nombre,
         descripcion,
-        ubicacion: { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] },
+        ubicacion: {
+          type: "Point",
+          coordinates: [parseFloat(lng), parseFloat(lat)],
+        },
         direccion: { calle, ciudad, pais, codigo_postal: codigoPostal },
         categorias,
         horario,
         telefono,
-      }
+      };
       if (uploadedImgId) {
-        patch.img_portada_id = uploadedImgId
-        patch.img_portada = `/api/files/${uploadedImgId}`
+        patch.img_portada_id = uploadedImgId;
+        patch.img_portada = `/api/files/${uploadedImgId}`;
       }
-      await updateRestaurante(restId!, patch)
-      navigate("/propietario")
+      await updateRestaurante(restId!, patch);
+      navigate("/propietario");
     } catch (err) {
-      console.error("Error guardando restaurante:", err)
+      console.error("Error guardando restaurante:", err);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   const handleToggleActivo = async () => {
     try {
-      await updateRestaurante(restId!, { activo: !restaurant.activo })
+      await updateRestaurante(restId!, { activo: !restaurant.activo });
     } catch (err) {
-      console.error("Error toggling activo:", err)
+      console.error("Error toggling activo:", err);
     }
-  }
+  };
 
   const handleDelete = async () => {
     try {
-      await deleteRestaurante(restId!)
-      navigate("/propietario")
+      await deleteRestaurante(restId!);
+      navigate("/propietario");
     } catch (err) {
-      console.error("Error eliminando restaurante:", err)
+      console.error("Error eliminando restaurante:", err);
     }
-  }
+  };
 
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-6 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/propietario")}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/propietario")}
+          >
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Editar Restaurante</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              Editar Restaurante
+            </h1>
             <div className="flex items-center gap-2 mt-0.5">
               <StatusBadge status={restaurant.activo ? "activo" : "inactivo"} />
             </div>
@@ -163,44 +203,109 @@ export default function PropietarioEditarRestaurante() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         {/* Imagen de portada */}
         <Card className="border-0 shadow-sm">
-          <CardHeader><CardTitle className="text-foreground text-base">Imagen de Portada</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-foreground text-base">
+              Imagen de Portada
+            </CardTitle>
+          </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <div className="relative h-40 w-full overflow-hidden rounded-lg bg-muted">
-              {imgPreview
-                ? <img src={imgPreview} alt="Portada" className="h-full w-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />
-                : <div className="flex h-full items-center justify-center"><ImageIcon size={40} className="text-muted-foreground/40" /></div>
-              }
+              {imgPreview ? (
+                <img
+                  src={imgPreview}
+                  alt="Portada"
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display =
+                      "none";
+                  }}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <ImageIcon size={40} className="text-muted-foreground/40" />
+                </div>
+              )}
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-            <Button type="button" variant="outline" size="sm" className="gap-2 self-start" onClick={() => fileInputRef.current?.click()} disabled={uploadingImg}>
-              {uploadingImg ? <><Loader2 size={14} className="animate-spin" /> Subiendo...</> : <><Upload size={14} /> Cambiar imagen</>}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageChange}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2 self-start"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingImg}
+            >
+              {uploadingImg ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Subiendo...
+                </>
+              ) : (
+                <>
+                  <Upload size={14} /> Cambiar imagen
+                </>
+              )}
             </Button>
-            {uploadedImgId && <p className="text-xs text-emerald-600">✓ Imagen subida correctamente</p>}
+            {uploadedImgId && (
+              <p className="text-xs text-emerald-600">
+                ✓ Imagen subida correctamente
+              </p>
+            )}
           </CardContent>
         </Card>
 
         {/* Información general */}
         <Card className="border-0 shadow-sm">
-          <CardHeader><CardTitle className="text-foreground text-base">Información General</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-foreground text-base">
+              Información General
+            </CardTitle>
+          </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="nombre">Nombre del restaurante</Label>
-              <Input id="nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+              <Input
+                id="nombre"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                required
+              />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="desc">Descripción</Label>
-              <Textarea id="desc" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={3} required />
+              <Textarea
+                id="desc"
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+                rows={3}
+                required
+              />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="tel">Teléfono</Label>
-              <Input id="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+              <Input
+                id="tel"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+              />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Categorías</Label>
               <PreferenceTags
                 tags={RESTAURANT_CATEGORIES}
                 selected={categorias}
-                onToggle={(t) => setCategorias((prev) => prev.includes(t) ? prev.filter((c) => c !== t) : [...prev, t])}
+                onToggle={(t) =>
+                  setCategorias((prev) =>
+                    prev.includes(t)
+                      ? prev.filter((c) => c !== t)
+                      : [...prev, t],
+                  )
+                }
               />
             </div>
           </CardContent>
@@ -208,34 +313,64 @@ export default function PropietarioEditarRestaurante() {
 
         {/* Dirección y ubicación */}
         <Card className="border-0 shadow-sm">
-          <CardHeader><CardTitle className="text-foreground text-base">Dirección y Ubicación</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-foreground text-base">
+              Dirección y Ubicación
+            </CardTitle>
+          </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="calle">Dirección</Label>
-              <Input id="calle" value={calle} onChange={(e) => setCalle(e.target.value)} required />
+              <Input
+                id="calle"
+                value={calle}
+                onChange={(e) => setCalle(e.target.value)}
+                required
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="ciudad">Ciudad</Label>
-                <Input id="ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} required />
+                <Input
+                  id="ciudad"
+                  value={ciudad}
+                  onChange={(e) => setCiudad(e.target.value)}
+                  required
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="pais">País</Label>
-                <Input id="pais" value={pais} onChange={(e) => setPais(e.target.value)} />
+                <Input
+                  id="pais"
+                  value={pais}
+                  onChange={(e) => setPais(e.target.value)}
+                />
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="cp">Código Postal</Label>
-              <Input id="cp" value={codigoPostal} onChange={(e) => setCodigoPostal(e.target.value)} />
+              <Input
+                id="cp"
+                value={codigoPostal}
+                onChange={(e) => setCodigoPostal(e.target.value)}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="lat">Latitud</Label>
-                <Input id="lat" value={lat} onChange={(e) => setLat(e.target.value)} />
+                <Input
+                  id="lat"
+                  value={lat}
+                  onChange={(e) => setLat(e.target.value)}
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="lng">Longitud</Label>
-                <Input id="lng" value={lng} onChange={(e) => setLng(e.target.value)} />
+                <Input
+                  id="lng"
+                  value={lng}
+                  onChange={(e) => setLng(e.target.value)}
+                />
               </div>
             </div>
           </CardContent>
@@ -243,52 +378,106 @@ export default function PropietarioEditarRestaurante() {
 
         {/* Horario */}
         <Card className="border-0 shadow-sm">
-          <CardHeader><CardTitle className="text-foreground text-base">Horario</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-foreground text-base">Horario</CardTitle>
+          </CardHeader>
           <CardContent>
             <div className="flex flex-col gap-3">
               {DIAS.map(({ key, label }) => {
-                const dia = horario[key] || { abre: "08:00", cierra: "22:00", cerrado: false }
+                const dia = horario[key] || {
+                  abre: "08:00",
+                  cierra: "22:00",
+                  cerrado: false,
+                };
                 return (
-                  <div key={key} className="grid grid-cols-[100px_1fr_1fr_auto] items-center gap-3">
-                    <span className="text-sm font-medium text-foreground">{label}</span>
+                  <div
+                    key={key}
+                    className="grid grid-cols-[100px_1fr_1fr_auto] items-center gap-3"
+                  >
+                    <span className="text-sm font-medium text-foreground">
+                      {label}
+                    </span>
                     <div className="flex flex-col gap-1">
-                      <Label className="text-[10px] text-muted-foreground">Abre</Label>
-                      <Input type="time" value={dia.abre} disabled={dia.cerrado} onChange={(e) => updateDia(key, "abre", e.target.value)} className="h-8 text-sm" />
+                      <Label className="text-[10px] text-muted-foreground">
+                        Abre
+                      </Label>
+                      <Input
+                        type="time"
+                        value={dia.abre}
+                        disabled={dia.cerrado}
+                        onChange={(e) => updateDia(key, "abre", e.target.value)}
+                        className="h-8 text-sm"
+                      />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <Label className="text-[10px] text-muted-foreground">Cierra</Label>
-                      <Input type="time" value={dia.cierra} disabled={dia.cerrado} onChange={(e) => updateDia(key, "cierra", e.target.value)} className="h-8 text-sm" />
+                      <Label className="text-[10px] text-muted-foreground">
+                        Cierra
+                      </Label>
+                      <Input
+                        type="time"
+                        value={dia.cierra}
+                        disabled={dia.cerrado}
+                        onChange={(e) =>
+                          updateDia(key, "cierra", e.target.value)
+                        }
+                        className="h-8 text-sm"
+                      />
                     </div>
                     <div className="flex flex-col items-center gap-1 pt-4">
-                      <Label className="text-[10px] text-muted-foreground">Cerrado</Label>
-                      <Checkbox checked={dia.cerrado} onCheckedChange={(v) => updateDia(key, "cerrado", !!v)} />
+                      <Label className="text-[10px] text-muted-foreground">
+                        Cerrado
+                      </Label>
+                      <Checkbox
+                        checked={dia.cerrado}
+                        onCheckedChange={(v) => updateDia(key, "cerrado", !!v)}
+                      />
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
           </CardContent>
         </Card>
 
-        <Button type="submit" className="w-full" disabled={categorias.length === 0 || saving || uploadingImg}>
-          {saving ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : "Guardar Cambios"}
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={categorias.length === 0 || saving || uploadingImg}
+        >
+          {saving ? (
+            <>
+              <Loader2 size={16} className="animate-spin" /> Guardando...
+            </>
+          ) : (
+            "Guardar Cambios"
+          )}
         </Button>
       </form>
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-foreground">Eliminar restaurante</DialogTitle>
+            <DialogTitle className="text-foreground">
+              Eliminar restaurante
+            </DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground">
-            Esta acción eliminará permanentemente <strong>{restaurant.nombre}</strong> y todos sus platillos.
+            Esta acción eliminará permanentemente{" "}
+            <strong>{restaurant.nombre}</strong> y todos sus platillos.
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleDelete}>Eliminar</Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Eliminar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

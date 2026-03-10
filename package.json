@@ -8,6 +8,8 @@
         "test": "turbo test",
         "test:cov": "turbo test:cov",
         "lint": "turbo lint",
+        "lint:fix": "turbo lint -- --fix",
+        "format": "prettier --write .",
         "clean": "turbo clean && find apps -maxdepth 2 -name dist -type d -exec rm -rf {} + 2>/dev/null; true"
     },
     "keywords": [],

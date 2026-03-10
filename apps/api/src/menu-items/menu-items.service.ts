@@ -17,9 +17,7 @@ export class MenuItemsService {
     @InjectModel(Restaurante.name) private restauranteModel: Model<any>,
   ) {}
 
-  async createMany(
-    dtos: CreateMenuItemDto[],
-  ): Promise<MenuItemDocument[]> {
+  async createMany(dtos: CreateMenuItemDto[]): Promise<MenuItemDocument[]> {
     if (!dtos.length) throw new BadRequestException('La lista está vacía');
 
     // Validar restaurante una sola vez

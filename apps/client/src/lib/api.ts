@@ -4,25 +4,26 @@
 // Vite proxy redirige /api → http://localhost:3000/
 // ============================================================
 
-const BASE = '/api'
+const BASE = "/api";
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
-  })
-  const json = await res.json()
-  if (!json.success) throw new Error(json.message || `API error ${res.status}`)
-  return json.data as T
+  });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message || `API error ${res.status}`);
+  return json.data as T;
 }
 
 // ── Helpers ─────────────────────────────────────────────────
 
 // MongoDB Decimal128 llega como { $numberDecimal: "405.00" }
 function toNum(v: any): number {
-  if (typeof v === 'number') return v
-  if (v && typeof v === 'object' && '$numberDecimal' in v) return parseFloat(v.$numberDecimal)
-  return parseFloat(v) || 0
+  if (typeof v === "number") return v;
+  if (v && typeof v === "object" && "$numberDecimal" in v)
+    return parseFloat(v.$numberDecimal);
+  return parseFloat(v) || 0;
 }
 
 // ── Normalizers ─────────────────────────────────────────────
@@ -32,11 +33,13 @@ function normalizeRestaurante(r: any): any {
     ...r,
     _id: r._id?.toString(),
     propietario_id: r.propietario_id?.toString?.() ?? r.propietario_id,
-    img_portada: r.img_portada_id ? `/api/files/${r.img_portada_id}` : (r.img_portada ?? ''),
-    fecha_creacion: r.createdAt ?? r.fecha_creacion ?? '',
+    img_portada: r.img_portada_id
+      ? `/api/files/${r.img_portada_id}`
+      : (r.img_portada ?? ""),
+    fecha_creacion: r.createdAt ?? r.fecha_creacion ?? "",
     calificacion_prom: r.calificacion_prom ?? 0,
     total_resenas: r.total_resenas ?? 0,
-  }
+  };
 }
 
 function normalizeMenuItem(m: any): any {
@@ -44,71 +47,79 @@ function normalizeMenuItem(m: any): any {
     ...m,
     _id: m._id?.toString(),
     restaurante_id: m.restaurante_id?.toString?.() ?? m.restaurante_id,
-    imagen: m.imagen_id ? `/api/files/${m.imagen_id}` : (m.imagen ?? ''),
-    fecha_creacion: m.createdAt ?? m.fecha_creacion ?? '',
+    imagen: m.imagen_id ? `/api/files/${m.imagen_id}` : (m.imagen ?? ""),
+    fecha_creacion: m.createdAt ?? m.fecha_creacion ?? "",
     precio: toNum(m.precio),
     veces_ordenado: m.veces_ordenado ?? 0,
-  }
+  };
 }
 
 function normalizeOrden(o: any): any {
   // usuario_id puede estar populado como objeto {_id, nombre, email} o como string
-  const usuarioObj = o.usuario_id
-  const usuarioId = typeof usuarioObj === 'object' && usuarioObj !== null
-    ? usuarioObj._id?.toString()
-    : usuarioObj?.toString()
-  const restauranteObj = o.restaurante_id
-  const restauranteId = typeof restauranteObj === 'object' && restauranteObj !== null
-    ? restauranteObj._id?.toString()
-    : restauranteObj?.toString()
+  const usuarioObj = o.usuario_id;
+  const usuarioId =
+    typeof usuarioObj === "object" && usuarioObj !== null
+      ? usuarioObj._id?.toString()
+      : usuarioObj?.toString();
+  const restauranteObj = o.restaurante_id;
+  const restauranteId =
+    typeof restauranteObj === "object" && restauranteObj !== null
+      ? restauranteObj._id?.toString()
+      : restauranteObj?.toString();
   return {
     ...o,
     _id: o._id?.toString(),
-    usuario_id: usuarioId ?? '',
-    restaurante_id: restauranteId ?? '',
-    estado: o.estado ?? 'pendiente',
+    usuario_id: usuarioId ?? "",
+    restaurante_id: restauranteId ?? "",
+    estado: o.estado ?? "pendiente",
     historial_estados: o.historial_estados ?? [],
     tiene_resena: o.tiene_resena ?? false,
-    fecha_creacion: o.fecha_creacion ?? o.createdAt ?? '',
+    fecha_creacion: o.fecha_creacion ?? o.createdAt ?? "",
     total: toNum(o.total),
     items: (o.items ?? []).map((i: any) => {
-      const precio = toNum(i.precio_unitario ?? i.precio)
-      const subtotal = toNum(i.subtotal) || precio * (i.cantidad ?? 1)
-      return { ...i, precio_unitario: precio, precio, subtotal }
+      const precio = toNum(i.precio_unitario ?? i.precio);
+      const subtotal = toNum(i.subtotal) || precio * (i.cantidad ?? 1);
+      return { ...i, precio_unitario: precio, precio, subtotal };
     }),
-  }
+  };
 }
 
 function normalizeResena(r: any): any {
-  const usuarioObj = r.usuario_id
-  const usuarioId = typeof usuarioObj === 'object' && usuarioObj !== null
-    ? usuarioObj._id?.toString()
-    : usuarioObj?.toString()
-  const usuarioNombre = typeof usuarioObj === 'object' && usuarioObj !== null
-    ? usuarioObj.nombre
-    : undefined
+  const usuarioObj = r.usuario_id;
+  const usuarioId =
+    typeof usuarioObj === "object" && usuarioObj !== null
+      ? usuarioObj._id?.toString()
+      : usuarioObj?.toString();
+  const usuarioNombre =
+    typeof usuarioObj === "object" && usuarioObj !== null
+      ? usuarioObj.nombre
+      : undefined;
 
-  const restauranteObj = r.restaurante_id
-  const restauranteId = typeof restauranteObj === 'object' && restauranteObj !== null && restauranteObj._id
-    ? restauranteObj._id?.toString()
-    : restauranteObj?.toString?.() ?? restauranteObj
-  const restauranteNombre = typeof restauranteObj === 'object' && restauranteObj !== null
-    ? restauranteObj.nombre
-    : undefined
+  const restauranteObj = r.restaurante_id;
+  const restauranteId =
+    typeof restauranteObj === "object" &&
+    restauranteObj !== null &&
+    restauranteObj._id
+      ? restauranteObj._id?.toString()
+      : (restauranteObj?.toString?.() ?? restauranteObj);
+  const restauranteNombre =
+    typeof restauranteObj === "object" && restauranteObj !== null
+      ? restauranteObj.nombre
+      : undefined;
 
   return {
     ...r,
     _id: r._id?.toString(),
-    usuario_id: usuarioId ?? '',
+    usuario_id: usuarioId ?? "",
     usuario_nombre: usuarioNombre,
-    restaurante_id: restauranteId ?? '',
+    restaurante_id: restauranteId ?? "",
     restaurante_nombre: restauranteNombre,
     orden_id: r.orden_id?.toString?.() ?? r.orden_id,
     likes: r.likes ?? [],
     tags: r.tags ?? [],
     activa: r.activa ?? true,
-    fecha: r.fecha ?? r.createdAt ?? '',
-  }
+    fecha: r.fecha ?? r.createdAt ?? "",
+  };
 }
 
 // ── API object ───────────────────────────────────────────────
@@ -116,74 +127,94 @@ function normalizeResena(r: any): any {
 export const api = {
   // Auth
   login: (email: string) =>
-    req<any>('/users/login', { method: 'POST', body: JSON.stringify({ email }) }),
+    req<any>("/users/login", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
 
   register: (data: any) =>
-    req<any>('/users', { method: 'POST', body: JSON.stringify(data) }),
+    req<any>("/users", { method: "POST", body: JSON.stringify(data) }),
 
   // Users
   getUsers: (params?: { rol?: string; email?: string }) => {
-    const qs = params ? `?${new URLSearchParams(params as any)}` : ''
-    return req<any[]>(`/users${qs}`)
+    const qs = params ? `?${new URLSearchParams(params as any)}` : "";
+    return req<any[]>(`/users${qs}`);
   },
 
   // Restaurants
   getRestaurantes: () =>
-    req<any[]>('/restaurants').then((rs) => rs.map(normalizeRestaurante)),
+    req<any[]>("/restaurants").then((rs) => rs.map(normalizeRestaurante)),
 
   getRestaurante: (id: string) =>
     req<any>(`/restaurants/${id}`).then(normalizeRestaurante),
 
   getNearRestaurantes: (lng: number, lat: number, maxDistance = 5000) =>
-    req<any[]>(`/restaurants/near?lng=${lng}&lat=${lat}&maxDistance=${maxDistance}`)
-      .then((rs) => rs.map(normalizeRestaurante)),
+    req<any[]>(
+      `/restaurants/near?lng=${lng}&lat=${lat}&maxDistance=${maxDistance}`,
+    ).then((rs) => rs.map(normalizeRestaurante)),
 
   createRestaurante: (data: any) =>
-    req<any>('/restaurants', { method: 'POST', body: JSON.stringify(data) })
-      .then(normalizeRestaurante),
+    req<any>("/restaurants", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then(normalizeRestaurante),
 
   updateRestaurante: (id: string, data: any) =>
-    req<any>(`/restaurants/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
-      .then(normalizeRestaurante),
+    req<any>(`/restaurants/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }).then(normalizeRestaurante),
 
   deleteRestaurante: (id: string) =>
-    req<any>(`/restaurants/${id}`, { method: 'DELETE' }),
+    req<any>(`/restaurants/${id}`, { method: "DELETE" }),
 
   // Menu Items
   getMenuItems: (restauranteId: string) =>
-    req<any[]>(`/menu-items?restaurante_id=${restauranteId}&disponible=true`)
-      .then((ms) => ms.map(normalizeMenuItem)),
+    req<any[]>(
+      `/menu-items?restaurante_id=${restauranteId}&disponible=true`,
+    ).then((ms) => ms.map(normalizeMenuItem)),
 
   // Todos los ítems (para gestión del propietario — incluye no disponibles)
   getMenuItemsManage: (restauranteId: string) =>
-    req<any[]>(`/menu-items?restaurante_id=${restauranteId}`)
-      .then((ms) => ms.map(normalizeMenuItem)),
+    req<any[]>(`/menu-items?restaurante_id=${restauranteId}`).then((ms) =>
+      ms.map(normalizeMenuItem),
+    ),
 
   createMenuItem: (data: any) =>
-    req<any>('/menu-items', { method: 'POST', body: JSON.stringify(data) })
-      .then(normalizeMenuItem),
+    req<any>("/menu-items", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then(normalizeMenuItem),
 
   createMenuItemsBulk: (data: any[]) =>
-    req<any[]>('/menu-items/bulk', { method: 'POST', body: JSON.stringify(data) })
-      .then((items) => items.map(normalizeMenuItem)),
+    req<any[]>("/menu-items/bulk", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((items) => items.map(normalizeMenuItem)),
 
   updateMenuItem: (id: string, data: any) =>
-    req<any>(`/menu-items/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
-      .then(normalizeMenuItem),
+    req<any>(`/menu-items/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }).then(normalizeMenuItem),
 
   deleteMenuItem: (id: string) =>
-    req<any>(`/menu-items/${id}`, { method: 'DELETE' }),
+    req<any>(`/menu-items/${id}`, { method: "DELETE" }),
 
   deleteMenuItemsByRestaurant: (restauranteId: string) =>
-    req<any>(`/menu-items/restaurant/${restauranteId}`, { method: 'DELETE' }),
+    req<any>(`/menu-items/restaurant/${restauranteId}`, { method: "DELETE" }),
 
   // Orders
-  getOrder: (id: string) =>
-    req<any>(`/orders/${id}`).then(normalizeOrden),
+  getOrder: (id: string) => req<any>(`/orders/${id}`).then(normalizeOrden),
 
-  getOrders: (params?: { cliente_id?: string; restaurante_id?: string; estado?: string; limit?: string }) => {
-    const qs = params ? `?${new URLSearchParams(params as any)}` : ''
-    return req<any[]>(`/orders${qs}`).then((os) => os.map(normalizeOrden))
+  getOrders: (params?: {
+    cliente_id?: string;
+    restaurante_id?: string;
+    estado?: string;
+    limit?: string;
+  }) => {
+    const qs = params ? `?${new URLSearchParams(params as any)}` : "";
+    return req<any[]>(`/orders${qs}`).then((os) => os.map(normalizeOrden));
   },
 
   createOrder: (data: any) => {
@@ -199,53 +230,62 @@ export const api = {
       })),
       direccion_entrega: data.direccion_entrega,
       notas: data.notas,
-    }
-    return req<any>('/orders', { method: 'POST', body: JSON.stringify(body) })
-      .then(normalizeOrden)
+    };
+    return req<any>("/orders", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }).then(normalizeOrden);
   },
 
   updateOrderStatus: (id: string, estado: string) =>
     req<any>(`/orders/${id}/status`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify({ estado }),
     }).then(normalizeOrden),
 
   // Reviews
   getReviews: (restauranteId: string, skip = 0, limit = 10) =>
-    req<any[]>(`/reviews/restaurant/${restauranteId}?skip=${skip}&limit=${limit}`).then((rs) => rs.map(normalizeResena)),
+    req<any[]>(
+      `/reviews/restaurant/${restauranteId}?skip=${skip}&limit=${limit}`,
+    ).then((rs) => rs.map(normalizeResena)),
 
   getReviewsByUser: (userId: string) =>
     req<any[]>(`/reviews/user/${userId}`).then((rs) => rs.map(normalizeResena)),
 
   createReview: (data: any) =>
-    req<any>('/reviews', { method: 'POST', body: JSON.stringify(data) }),
+    req<any>("/reviews", { method: "POST", body: JSON.stringify(data) }),
 
   deleteReview: (id: string) =>
-    req<any>(`/reviews/${id}`, { method: 'DELETE' }),
+    req<any>(`/reviews/${id}`, { method: "DELETE" }),
 
   // Reports
-  getOrdersByStatus: () => req<any>('/reports/orders/by-status'),
-  getTopRestaurantes: () => req<any[]>('/reports/restaurants/top-rated'),
-  getBestSellers: () => req<any[]>('/reports/menu-items/best-sellers'),
+  getOrdersByStatus: () => req<any>("/reports/orders/by-status"),
+  getTopRestaurantes: () => req<any[]>("/reports/restaurants/top-rated"),
+  getBestSellers: () => req<any[]>("/reports/menu-items/best-sellers"),
   getRevenueByDay: (from?: string, to?: string) => {
-    const qs = new URLSearchParams()
-    if (from) qs.set('from', from)
-    if (to) qs.set('to', to)
-    return req<any[]>(`/reports/revenue/by-day?${qs}`)
+    const qs = new URLSearchParams();
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
+    return req<any[]>(`/reports/revenue/by-day?${qs}`);
   },
-  getRestaurantesByCategory: () => req<any[]>('/reports/restaurants/by-category'),
+  getRestaurantesByCategory: () =>
+    req<any[]>("/reports/restaurants/by-category"),
 
   // Files
   uploadFile: async (file: File): Promise<{ id: string; filename: string }> => {
-    const formData = new FormData()
-    formData.append('file', file)
-    const res = await fetch(`${BASE}/files/upload`, { method: 'POST', body: formData })
-    const json = await res.json()
-    if (!json.success) throw new Error(json.message || 'Error subiendo archivo')
-    return json.data as { id: string; filename: string }
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${BASE}/files/upload`, {
+      method: "POST",
+      body: formData,
+    });
+    const json = await res.json();
+    if (!json.success)
+      throw new Error(json.message || "Error subiendo archivo");
+    return json.data as { id: string; filename: string };
   },
 
   // Seed
-  runSeed: () => req<any>('/seed', { method: 'POST' }),
-  clearSeed: () => req<any>('/seed', { method: 'DELETE' }),
-}
+  runSeed: () => req<any>("/seed", { method: "POST" }),
+  clearSeed: () => req<any>("/seed", { method: "DELETE" }),
+};

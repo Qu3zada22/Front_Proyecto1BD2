@@ -28,48 +28,48 @@ Se realizó una revisión exhaustiva cruzando:
 
 ## Verificación de Requisitos del PDF
 
-| Requisito                                                            | Estado | Notas                                                                                 |
-| -------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------- |
-| 5 colecciones                                                        | ✅     | usuarios, restaurantes, menu_items, ordenes, resenas                                  |
-| notablescan=1 compatible                                             | ✅     | Todos los findAll/aggregations usan índices                                           |
-| Documentos embebidos                                                 | ✅     | ItemOrden, DireccionEntrega, DireccionUsuario, HorarioDia, EstadoLog                  |
-| Documentos referenciados                                             | ✅     | usuario_id, restaurante_id, orden_id, propietario_id, menu_item_id                    |
-| CRUD completo                                                        | ✅     | Create/Read/Update/Delete en todas las colecciones                                    |
-| Filtros, Proyecciones, Ordenamiento, Skip, Límite                    | ✅     | PaginationDto, select, sort, populate con campos, $project                            |
-| Actualizar 1 / varios documentos                                     | ✅     | update + updateMany                                                                   |
-| Eliminar 1 / varios documentos                                       | ✅     | remove + removeMany/removeByRestaurant                                                |
-| ≥50,000 documentos                                                   | ✅     | 50,000 órdenes via seed                                                               |
-| GridFS                                                               | ✅     | FilesService con upload/download/delete/list                                          |
-| Agregaciones simples (count, distinct)                               | ✅     | ordenesPorEstado, totalOrdenes, categoriasDistintas, usuariosPorRol                   |
-| Pipelines complejos                                                  | ✅     | 6 pipelines multi-etapa + 4 simples = 10 aggregations                                |
-| Manejo de arrays ($push, $pull, $addToSet)                           | ✅     | addAddress, removeAddress, addLike, removeLike, addTag, removeTag, historial_estados  |
-| Operaciones BULK (bulkWrite)                                         | ✅     | ordenes.create y ordenes.remove usan bulkWrite                                        |
-| Transacciones ACID                                                   | ✅     | ordenes.create/remove/removeMany, resenas.create/remove, cancelarRestaurante          |
-| Índices: Simple, Compuesto, Multikey, 2dsphere, Texto                | ✅     | 33 índices en 5 colecciones                                                           |
-| Lookups multi-colección                                              | ✅     | populate + $lookup en pipelines                                                       |
-| Frontend                                                             | ✅     | apps/client/ con React + Vite                                                         |
+| Requisito                                             | Estado | Notas                                                                                |
+| ----------------------------------------------------- | ------ | ------------------------------------------------------------------------------------ |
+| 5 colecciones                                         | ✅     | usuarios, restaurantes, menu_items, ordenes, resenas                                 |
+| notablescan=1 compatible                              | ✅     | Todos los findAll/aggregations usan índices                                          |
+| Documentos embebidos                                  | ✅     | ItemOrden, DireccionEntrega, DireccionUsuario, HorarioDia, EstadoLog                 |
+| Documentos referenciados                              | ✅     | usuario_id, restaurante_id, orden_id, propietario_id, menu_item_id                   |
+| CRUD completo                                         | ✅     | Create/Read/Update/Delete en todas las colecciones                                   |
+| Filtros, Proyecciones, Ordenamiento, Skip, Límite     | ✅     | PaginationDto, select, sort, populate con campos, $project                           |
+| Actualizar 1 / varios documentos                      | ✅     | update + updateMany                                                                  |
+| Eliminar 1 / varios documentos                        | ✅     | remove + removeMany/removeByRestaurant                                               |
+| ≥50,000 documentos                                    | ✅     | 50,000 órdenes via seed                                                              |
+| GridFS                                                | ✅     | FilesService con upload/download/delete/list                                         |
+| Agregaciones simples (count, distinct)                | ✅     | ordenesPorEstado, totalOrdenes, categoriasDistintas, usuariosPorRol                  |
+| Pipelines complejos                                   | ✅     | 6 pipelines multi-etapa + 4 simples = 10 aggregations                                |
+| Manejo de arrays ($push, $pull, $addToSet)            | ✅     | addAddress, removeAddress, addLike, removeLike, addTag, removeTag, historial_estados |
+| Operaciones BULK (bulkWrite)                          | ✅     | ordenes.create y ordenes.remove usan bulkWrite                                       |
+| Transacciones ACID                                    | ✅     | ordenes.create/remove/removeMany, resenas.create/remove, cancelarRestaurante         |
+| Índices: Simple, Compuesto, Multikey, 2dsphere, Texto | ✅     | 33 índices en 5 colecciones                                                          |
+| Lookups multi-colección                               | ✅     | populate + $lookup en pipelines                                                      |
+| Frontend                                              | ✅     | apps/client/ con React + Vite                                                        |
 
 **Transacción "Crear Orden" vs PDF Spec (annotated-Proyecto1-bd2-1.pdf):**
 
-| Paso (PDF)                                                      | Estado | Detalle                                                                |
-| --------------------------------------------------------------- | ------ | ---------------------------------------------------------------------- |
-| 1. Verificar `disponible:true` para cada item_id                | ✅     | `find({ _id: { $in: ... }, disponible: true })`                       |
-| 2. Recalcular total con precios actuales de BD                  | ❌     | **BUG-01**: Usa precios del DTO (cliente), no de la BD                 |
-| 3. insertOne(ordenes) con snapshot de items y total              | ✅     | `ordenModel.create([...], { session })`                                |
-| 4. bulkWrite: `$inc veces_ordenado` en cada menu_item           | ✅     | `menuItemModel.bulkWrite(bulkOps, { session })`                       |
-| 5. COMMIT si OK / ROLLBACK si falla                             | ✅     | try/catch con commit/abort/endSession                                  |
+| Paso (PDF)                                            | Estado | Detalle                                                |
+| ----------------------------------------------------- | ------ | ------------------------------------------------------ |
+| 1. Verificar `disponible:true` para cada item_id      | ✅     | `find({ _id: { $in: ... }, disponible: true })`        |
+| 2. Recalcular total con precios actuales de BD        | ❌     | **BUG-01**: Usa precios del DTO (cliente), no de la BD |
+| 3. insertOne(ordenes) con snapshot de items y total   | ✅     | `ordenModel.create([...], { session })`                |
+| 4. bulkWrite: `$inc veces_ordenado` en cada menu_item | ✅     | `menuItemModel.bulkWrite(bulkOps, { session })`        |
+| 5. COMMIT si OK / ROLLBACK si falla                   | ✅     | try/catch con commit/abort/endSession                  |
 
 ---
 
 ## Sincronización Schemas ↔ Database Indexes
 
-| Colección    | Schema | DB  | Match |
-| ------------ | ------ | --- | ----- |
-| usuarios     | 7      | 7   | ✅    |
-| restaurantes | 6      | 6   | ✅    |
-| menu_items   | 7      | 7   | ✅    |
-| ordenes      | 6      | 6   | ✅    |
-| resenas      | 7      | 7   | ✅    |
+| Colección    | Schema | DB     | Match  |
+| ------------ | ------ | ------ | ------ |
+| usuarios     | 7      | 7      | ✅     |
+| restaurantes | 6      | 6      | ✅     |
+| menu_items   | 7      | 7      | ✅     |
+| ordenes      | 6      | 6      | ✅     |
+| resenas      | 7      | 7      | ✅     |
 | **Total**    | **33** | **33** | **✅** |
 
 ---
@@ -92,18 +92,22 @@ Sin embargo, el servicio actual construye el snapshot de items y calcula el tota
 ```ts
 // Actual (ordenes.service.ts)
 const itemsMapped = dto.items.map((i) => ({
-    item_id: new Types.ObjectId(i.menu_item_id),
-    nombre: i.nombre,
-    precio_unitario: i.precio,     // ← precio del DTO (cliente)
-    precio: i.precio,              // ← precio del DTO (cliente)
-    subtotal: i.precio * i.cantidad, // ← calculado con precio del DTO
+  item_id: new Types.ObjectId(i.menu_item_id),
+  nombre: i.nombre,
+  precio_unitario: i.precio, // ← precio del DTO (cliente)
+  precio: i.precio, // ← precio del DTO (cliente)
+  subtotal: i.precio * i.cantidad, // ← calculado con precio del DTO
 }));
 const total = itemsMapped.reduce((sum, i) => sum + i.subtotal, 0);
 
 // Paso 1: solo verifica disponibilidad, proyectando SOLO { _id: 1 }
 const disponibles = await this.menuItemModel
-    .find({ _id: { $in: uniqueItemIds }, disponible: true }, { _id: 1 }, { session })
-    .lean();
+  .find(
+    { _id: { $in: uniqueItemIds }, disponible: true },
+    { _id: 1 },
+    { session },
+  )
+  .lean();
 ```
 
 La verificación de disponibilidad consulta la BD pero solo proyecta `{ _id: 1 }` — nunca lee `nombre` ni `precio` del catálogo real.
@@ -114,28 +118,30 @@ Leer `nombre` y `precio` en la verificación de disponibilidad. Recalcular el sn
 ```ts
 // Fix: leer nombre y precio de la BD
 const dbItems = await this.menuItemModel
-    .find({ _id: { $in: uniqueItemIds }, disponible: true },
-           { _id: 1, nombre: 1, precio: 1 },
-           { session })
-    .lean();
+  .find(
+    { _id: { $in: uniqueItemIds }, disponible: true },
+    { _id: 1, nombre: 1, precio: 1 },
+    { session },
+  )
+  .lean();
 if (dbItems.length !== uniqueItemIds.length) {
-    throw new BadRequestException('Uno o más platillos no están disponibles');
+  throw new BadRequestException("Uno o más platillos no están disponibles");
 }
-const dbMap = new Map(dbItems.map(i => [i._id.toHexString(), i]));
+const dbMap = new Map(dbItems.map((i) => [i._id.toHexString(), i]));
 
 // Recalcular snapshot con precios reales de BD (paso 2 del PDF)
 const itemsMapped = dto.items.map((i) => {
-    const dbItem = dbMap.get(new Types.ObjectId(i.menu_item_id).toHexString());
-    return {
-        item_id: new Types.ObjectId(i.menu_item_id),
-        menu_item_id: new Types.ObjectId(i.menu_item_id),
-        nombre: dbItem.nombre,
-        precio_unitario: dbItem.precio,
-        precio: dbItem.precio,
-        cantidad: i.cantidad,
-        subtotal: dbItem.precio * i.cantidad,
-        ...(i.notas && { notas: i.notas }),
-    };
+  const dbItem = dbMap.get(new Types.ObjectId(i.menu_item_id).toHexString());
+  return {
+    item_id: new Types.ObjectId(i.menu_item_id),
+    menu_item_id: new Types.ObjectId(i.menu_item_id),
+    nombre: dbItem.nombre,
+    precio_unitario: dbItem.precio,
+    precio: dbItem.precio,
+    cantidad: i.cantidad,
+    subtotal: dbItem.precio * i.cantidad,
+    ...(i.notas && { notas: i.notas }),
+  };
 });
 const total = itemsMapped.reduce((sum, i) => sum + i.subtotal, 0);
 ```
@@ -151,7 +157,7 @@ const total = itemsMapped.reduce((sum, i) => sum + i.subtotal, 0);
 **Descripción:**  
 El PDF anotado del diseño define restricciones de longitud para la colección reseñas:
 
-> - `titulo`: string — Max 100 chars  
+> - `titulo`: string — Max 100 chars
 > - `comentario`: string — Min 10 chars
 
 Sin embargo, el DTO actual solo valida que sean strings opcionales, sin restricciones de longitud:
@@ -186,11 +192,13 @@ Agregar validación similar a los otros servicios antes de iniciar la transacci�
 
 ```ts
 const [userExists, restExists] = await Promise.all([
-    this.usuarioModel.countDocuments({ _id: dto.usuario_id }),
-    this.restauranteModel.countDocuments({ _id: dto.restaurante_id }),
+  this.usuarioModel.countDocuments({ _id: dto.usuario_id }),
+  this.restauranteModel.countDocuments({ _id: dto.restaurante_id }),
 ]);
-if (!userExists) throw new BadRequestException('El usuario referenciado no existe');
-if (!restExists) throw new BadRequestException('El restaurante referenciado no existe');
+if (!userExists)
+  throw new BadRequestException("El usuario referenciado no existe");
+if (!restExists)
+  throw new BadRequestException("El restaurante referenciado no existe");
 ```
 
 Esto requeriría inyectar `usuarioModel` y `restauranteModel` en `OrdenesService` y registrarlos en `OrdenesModule`.
@@ -243,47 +251,47 @@ ticket_prom:   { $avg: { $toDecimal: '$total' } },
 
 ### Services ↔ Controllers ↔ DTOs ↔ Modules
 
-| Módulo      | Service  | Controller | DTOs     | Module   | Spec     |
-| ----------- | -------- | ---------- | -------- | -------- | -------- |
-| usuarios    | ✅       | ✅         | ✅       | ✅       | ✅       |
-| restaurantes| ✅       | ✅         | ✅       | ✅       | ✅       |
-| menu-items  | ✅       | ✅         | ✅       | ✅       | ✅       |
-| ordenes     | ✅       | ✅         | ✅       | ✅       | ✅       |
-| resenas     | ✅       | ✅         | ✅       | ✅       | ✅       |
-| reportes    | ✅       | ✅         | N/A      | ✅       | ✅       |
-| files       | ✅       | ✅         | N/A      | ✅       | ✅       |
-| seed        | ✅       | ✅         | N/A      | ✅       | ✅       |
+| Módulo       | Service | Controller | DTOs | Module | Spec |
+| ------------ | ------- | ---------- | ---- | ------ | ---- |
+| usuarios     | ✅      | ✅         | ✅   | ✅     | ✅   |
+| restaurantes | ✅      | ✅         | ✅   | ✅     | ✅   |
+| menu-items   | ✅      | ✅         | ✅   | ✅     | ✅   |
+| ordenes      | ✅      | ✅         | ✅   | ✅     | ✅   |
+| resenas      | ✅      | ✅         | ✅   | ✅     | ✅   |
+| reportes     | ✅      | ✅         | N/A  | ✅     | ✅   |
+| files        | ✅      | ✅         | N/A  | ✅     | ✅   |
+| seed         | ✅      | ✅         | N/A  | ✅     | ✅   |
 
 ### FK Validación en Services (Post Auditoría #15)
 
-| Service               | FK validado                        | Estado |
-| --------------------- | ---------------------------------- | ------ |
-| resenas.create        | restaurante_id, orden_id           | ✅     |
-| menu-items.create     | restaurante_id                     | ✅     |
-| restaurantes.create   | propietario_id                     | ✅     |
-| ordenes.create        | usuario_id, restaurante_id         | ❌ OBS-01 |
-| usuarios.remove       | ordenes, resenas, restaurantes     | ✅     |
-| restaurantes.remove   | ordenes, menu_items                | ✅     |
+| Service             | FK validado                    | Estado    |
+| ------------------- | ------------------------------ | --------- |
+| resenas.create      | restaurante_id, orden_id       | ✅        |
+| menu-items.create   | restaurante_id                 | ✅        |
+| restaurantes.create | propietario_id                 | ✅        |
+| ordenes.create      | usuario_id, restaurante_id     | ❌ OBS-01 |
+| usuarios.remove     | ordenes, resenas, restaurantes | ✅        |
+| restaurantes.remove | ordenes, menu_items            | ✅        |
 
 ### Seed Data ↔ Schema Consistency
 
-| Campo              | Schema Type | Seed Type  | Compatible | Nota                              |
-| ------------------ | ----------- | ---------- | ---------- | --------------------------------- |
-| ordenes.total      | number      | Decimal128 | ✅         | ResponseInterceptor normaliza     |
-| items.precio_unit. | number      | Decimal128 | ✅         | ResponseInterceptor normaliza     |
-| items.subtotal     | number      | Decimal128 | ✅         | ResponseInterceptor normaliza     |
-| calificacion       | number      | int32      | ✅         | Directamente compatible           |
+| Campo              | Schema Type | Seed Type  | Compatible | Nota                          |
+| ------------------ | ----------- | ---------- | ---------- | ----------------------------- |
+| ordenes.total      | number      | Decimal128 | ✅         | ResponseInterceptor normaliza |
+| items.precio_unit. | number      | Decimal128 | ✅         | ResponseInterceptor normaliza |
+| items.subtotal     | number      | Decimal128 | ✅         | ResponseInterceptor normaliza |
+| calificacion       | number      | int32      | ✅         | Directamente compatible       |
 
 ### Pipelines Backend ↔ verify.js
 
-| Pipeline              | Backend API           | verify.js        | Match |
-| --------------------- | -------------------- | ---------------- | ----- |
-| Top Restaurantes      | topRestaurantes()    | restaurantesConRating() | ≈ Variante |
-| Platillos más vendidos| platillosMasVendidos()| topMenuItems()   | ≈ Variante |
-| Ingresos por día      | ingresosPorDia()     | N/A              | —     |
-| Revenue por restaurante| ingresosPorRestaurantePorMes() | revenueByRestaurant() | ≈ Variante |
-| Top usuarios gasto    | usuariosConMayorGasto() | clientesMasActivos() | ≈ Variante |
-| **Adicionales verify.js** | — | distribucionCalificaciones, topResenasPorLikes, estadosOrdenesPorRestaurante, itemsVeganosPorRestaurante, restaurantesCercanos | +5 extras |
+| Pipeline                  | Backend API                    | verify.js                                                                                                                      | Match      |
+| ------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| Top Restaurantes          | topRestaurantes()              | restaurantesConRating()                                                                                                        | ≈ Variante |
+| Platillos más vendidos    | platillosMasVendidos()         | topMenuItems()                                                                                                                 | ≈ Variante |
+| Ingresos por día          | ingresosPorDia()               | N/A                                                                                                                            | —          |
+| Revenue por restaurante   | ingresosPorRestaurantePorMes() | revenueByRestaurant()                                                                                                          | ≈ Variante |
+| Top usuarios gasto        | usuariosConMayorGasto()        | clientesMasActivos()                                                                                                           | ≈ Variante |
+| **Adicionales verify.js** | —                              | distribucionCalificaciones, topResenasPorLikes, estadosOrdenesPorRestaurante, itemsVeganosPorRestaurante, restaurantesCercanos | +5 extras  |
 
 ---
 
@@ -297,13 +305,13 @@ Snapshots:   0 total
 
 **Archivos afectados por los fixes propuestos:**
 
-| Archivo                          | Cambio propuesto                                    |
-| -------------------------------- | --------------------------------------------------- |
-| `ordenes.service.ts`             | BUG-01: Recalcular precios desde BD en create       |
-| `ordenes.service.spec.ts`        | BUG-01: Actualizar mocks para nuevos DB reads       |
-| `create-resena.dto.ts`           | BUG-02: Agregar @MaxLength(100) y @MinLength(10)    |
-| `ordenes.service.ts`             | OBS-01: Validar FK usuario_id y restaurante_id      |
-| `ordenes.module.ts`              | OBS-01: Registrar Usuario y Restaurante models      |
-| `ordenes.service.spec.ts`        | OBS-01: Agregar mocks para modelos nuevos           |
-| `create-resena.dto.ts`           | OBS-02: Cambiar @IsNumber() por @IsInt()            |
-| `pipelines.js`                   | OBS-03: Agregar $toDecimal en revenueByRestaurant   |
+| Archivo                   | Cambio propuesto                                  |
+| ------------------------- | ------------------------------------------------- |
+| `ordenes.service.ts`      | BUG-01: Recalcular precios desde BD en create     |
+| `ordenes.service.spec.ts` | BUG-01: Actualizar mocks para nuevos DB reads     |
+| `create-resena.dto.ts`    | BUG-02: Agregar @MaxLength(100) y @MinLength(10)  |
+| `ordenes.service.ts`      | OBS-01: Validar FK usuario_id y restaurante_id    |
+| `ordenes.module.ts`       | OBS-01: Registrar Usuario y Restaurante models    |
+| `ordenes.service.spec.ts` | OBS-01: Agregar mocks para modelos nuevos         |
+| `create-resena.dto.ts`    | OBS-02: Cambiar @IsNumber() por @IsInt()          |
+| `pipelines.js`            | OBS-03: Agregar $toDecimal en revenueByRestaurant |

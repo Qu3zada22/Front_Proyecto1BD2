@@ -1,4 +1,5 @@
 # AUDIT REPORT #10 — FastPochi Backend
+
 **Fecha:** 2026-03-10
 **Auditor:** Claude Sonnet 4.6
 **Scope:** Backend NestJS + MongoDB live data + unit tests
@@ -17,13 +18,13 @@
 
 ## Estado general
 
-| Colección   | Documentos |
-|-------------|-----------|
-| usuarios    | 15        |
-| restaurantes| 8         |
-| menu_items  | 72        |
-| ordenes     | 50 000    |
-| resenas     | 6 836     |
+| Colección    | Documentos |
+| ------------ | ---------- |
+| usuarios     | 15         |
+| restaurantes | 8          |
+| menu_items   | 72         |
+| ordenes      | 50 000     |
+| resenas      | 6 836      |
 
 **Todos los índices verificados en MongoDB** — 100% sincronizados con schemas y `indexes.js` tras Auditoría #9.
 
@@ -42,6 +43,7 @@
 El `ReportesService` tiene 10 métodos, pero `reportes.service.spec.ts` solo cubre 9. El método `usuariosConMayorGasto(limit)` no tiene ningún test.
 
 **Pipeline que debería estar probado:**
+
 ```typescript
 async usuariosConMayorGasto(limit = 10): Promise<any[]> {
     return this.ordenModel.aggregate([
@@ -57,6 +59,7 @@ async usuariosConMayorGasto(limit = 10): Promise<any[]> {
 
 **Propuesta de fix:**
 Añadir `describe('usuariosConMayorGasto')` con tests para:
+
 1. `$match` solo órdenes `estado: 'entregado'`
 2. `$group` por `usuario_id` con `$sum { $toDouble: '$total' }`
 3. `$sort` por `total_gastado` descendente
@@ -72,19 +75,24 @@ Añadir `describe('usuariosConMayorGasto')` con tests para:
 
 **Descripción:**
 El service acepta actor y nota:
+
 ```typescript
 async updateStatus(id: string, estado: string, actorId?: string, nota?: string)
 ```
+
 Pero el controller ignora ambos:
+
 ```typescript
 updateStatus(@Param('id', ParseMongoIdPipe) id: string, @Body('estado') estado: string) {
     return this.ordenesService.updateStatus(id, estado);  // actorId y nota: siempre undefined
 }
 ```
+
 Resultado: cada entrada de `historial_estados` creada via API carece de `actor_id` y `nota`, aunque los campos están en el schema y el service los soporta.
 
 **Propuesta de fix:**
 Leer `actor_id` y `nota` del body y pasarlos al service:
+
 ```typescript
 updateStatus(
     @Param('id', ParseMongoIdPipe) id: string,
@@ -105,12 +113,15 @@ updateStatus(
 
 **Descripción:**
 `findAll` no filtra por `disponible`:
+
 ```typescript
 async findAll(query: { restaurante_id?: string; categoria?: string; etiqueta?: string; ... })
 ```
+
 No hay parámetro `disponible` y el filtro resultante nunca incluye `{ disponible: true }`.
 
 Consecuencias:
+
 - `GET /api/menu-items?restaurante_id=xxx` devuelve platillos marcados como `disponible: false` (p.ej. tras `cancelarRestaurante`)
 - La UI muestra opciones que no se pueden ordenar
 
@@ -118,6 +129,7 @@ Consecuencias:
 
 **Propuesta de fix:**
 Añadir `disponible` como parámetro de filtro opcional con default `true` para el endpoint de listado:
+
 ```typescript
 async findAll(query: { restaurante_id?: string; categoria?: string; etiqueta?: string; disponible?: boolean; ... }) {
     const filter: any = {};
@@ -126,7 +138,9 @@ async findAll(query: { restaurante_id?: string; categoria?: string; etiqueta?: s
     ...
 }
 ```
+
 Y en el controller:
+
 ```typescript
 @ApiQuery({ name: 'disponible', required: false, type: Boolean, description: 'default: true' })
 ```
@@ -162,44 +176,46 @@ El índice compuesto `{estado:1, fecha_creacion:-1}` no existe. Los índices ESR
 
 **Descripción:**
 `find({ restaurante_id: X, activa: true }).sort({ calificacion: -1 })` usa `restaurante_calificacion ({restaurante_id:1, calificacion:-1})`. El campo `activa` queda en FETCH:
+
 ```
 FETCH(filter: activa: true)
   IXSCAN(restaurante_calificacion)
 ```
+
 Como actualmente todas las reseñas son `activa: true` (6836/6836), el FETCH es una no-op en producción. El índice cubre la E+S del patrón de acceso.
 
 ---
 
 ## Verificaciones OK (sin hallazgos)
 
-| Área | Estado |
-|------|--------|
-| Índices MongoDB (5 colecciones) | ✓ Todos correctos, sincronizados |
-| Transacción ACID `create orden` | ✓ session + bulkWrite + abort/commit/endSession |
-| Transacción ACID `cancelarRestaurante` | ✓ restaurante + menuItems + ordenes |
-| `$push {$each, $slice:-10}` en `addAddress` | ✓ máximo 10 direcciones |
-| `$addToSet` likes en reseñas | ✓ sin duplicados |
-| `$pull` likes y etiquetas | ✓ correcto |
-| Zero-padding de meses en `ingresosPorRestaurantePorMes` | ✓ `$cond + $concat['0',...]` |
-| Fecha inicio por defecto en `ingresosPorDia` | ✓ `2023-01-01` |
-| `normalizeDecimals` en ResponseInterceptor | ✓ cubre Decimal128 BSON y `$numberDecimal` JSON |
-| Seed → 50k órdenes correctas | ✓ distribución de estados OK |
-| Cross-field validation en `CreateResenaDto` | ✓ `@ValidateIf` restaurante_id/orden_id |
-| Denormalized `calificacion_prom` update | ✓ recalcula con aggregate tras create reseña |
-| Denormalized `tiene_resena` en ordenes | ✓ 6836 ordenes marcadas |
-| GridFS upload/download/delete | ✓ implementado en `files.service.ts` |
-| Respuesta API uniforme `{success, data, timestamp}` | ✓ ResponseInterceptor global |
+| Área                                                    | Estado                                          |
+| ------------------------------------------------------- | ----------------------------------------------- |
+| Índices MongoDB (5 colecciones)                         | ✓ Todos correctos, sincronizados                |
+| Transacción ACID `create orden`                         | ✓ session + bulkWrite + abort/commit/endSession |
+| Transacción ACID `cancelarRestaurante`                  | ✓ restaurante + menuItems + ordenes             |
+| `$push {$each, $slice:-10}` en `addAddress`             | ✓ máximo 10 direcciones                         |
+| `$addToSet` likes en reseñas                            | ✓ sin duplicados                                |
+| `$pull` likes y etiquetas                               | ✓ correcto                                      |
+| Zero-padding de meses en `ingresosPorRestaurantePorMes` | ✓ `$cond + $concat['0',...]`                    |
+| Fecha inicio por defecto en `ingresosPorDia`            | ✓ `2023-01-01`                                  |
+| `normalizeDecimals` en ResponseInterceptor              | ✓ cubre Decimal128 BSON y `$numberDecimal` JSON |
+| Seed → 50k órdenes correctas                            | ✓ distribución de estados OK                    |
+| Cross-field validation en `CreateResenaDto`             | ✓ `@ValidateIf` restaurante_id/orden_id         |
+| Denormalized `calificacion_prom` update                 | ✓ recalcula con aggregate tras create reseña    |
+| Denormalized `tiene_resena` en ordenes                  | ✓ 6836 ordenes marcadas                         |
+| GridFS upload/download/delete                           | ✓ implementado en `files.service.ts`            |
+| Respuesta API uniforme `{success, data, timestamp}`     | ✓ ResponseInterceptor global                    |
 
 ---
 
 ## Resumen prioridades
 
-| ID | Tipo | Archivo | Impacto |
-|----|------|---------|---------|
-| BUG-01 | Tests faltantes | `reportes.service.spec.ts` | Alta |
-| BUG-02 | Gap funcional | `ordenes.controller.ts` | Media |
-| BUG-03 | Gap funcional | `menu-items.service.ts` | Media |
-| OBS-01 | Optimización | `orden.schema.ts` + `indexes.js` | Baja |
-| OBS-02 | Informativa | — | — |
+| ID     | Tipo            | Archivo                          | Impacto |
+| ------ | --------------- | -------------------------------- | ------- |
+| BUG-01 | Tests faltantes | `reportes.service.spec.ts`       | Alta    |
+| BUG-02 | Gap funcional   | `ordenes.controller.ts`          | Media   |
+| BUG-03 | Gap funcional   | `menu-items.service.ts`          | Media   |
+| OBS-01 | Optimización    | `orden.schema.ts` + `indexes.js` | Baja    |
+| OBS-02 | Informativa     | —                                | —       |
 
 **Tests al cierre del audit:** 197/197 ✓

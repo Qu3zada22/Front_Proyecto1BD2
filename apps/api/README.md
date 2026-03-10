@@ -4,14 +4,14 @@ Backend REST del sistema de delivery de comida. Construido con **NestJS 11**, **
 
 ## Stack
 
-| Tecnología          | Versión  | Rol                              |
-|---------------------|----------|----------------------------------|
-| NestJS              | 11       | Framework HTTP                   |
-| Mongoose            | 9        | ODM para MongoDB                 |
-| @nestjs/mongoose    | 11       | Integración Mongoose + NestJS    |
-| class-validator     | latest   | Validación de DTOs               |
-| @nestjs/swagger     | latest   | Documentación OpenAPI            |
-| Jest                | 29       | Tests unitarios                  |
+| Tecnología       | Versión | Rol                           |
+| ---------------- | ------- | ----------------------------- |
+| NestJS           | 11      | Framework HTTP                |
+| Mongoose         | 9       | ODM para MongoDB              |
+| @nestjs/mongoose | 11      | Integración Mongoose + NestJS |
+| class-validator  | latest  | Validación de DTOs            |
+| @nestjs/swagger  | latest  | Documentación OpenAPI         |
+| Jest             | 29      | Tests unitarios               |
 
 ## Correr en desarrollo
 
@@ -24,6 +24,7 @@ npm run dev    # Turborepo levanta API + Frontend en paralelo
 ```
 
 La API queda disponible en:
+
 - **REST API:** `http://localhost:3000/api`
 - **Swagger UI:** `http://localhost:3000/docs` (solo en `NODE_ENV=development`)
 
@@ -49,19 +50,19 @@ npm run test:watch     # modo watch
 npm run test:cov       # con reporte de cobertura
 ```
 
-| Suite                              | Tests |
-|------------------------------------|-------|
-| `restaurantes.service.spec.ts`     | 25    |
-| `menu-items.service.spec.ts`       | 22    |
-| `ordenes.service.spec.ts`          | 36    |
-| `resenas.service.spec.ts`          | 32    |
-| `usuarios.service.spec.ts`         | 27    |
-| `reportes.service.spec.ts`         | 39    |
-| `files.service.spec.ts`            | 23    |
-| `seed.service.spec.ts`             | 6     |
-| `http-exception.filter.spec.ts`    | 8     |
-| `response.interceptor.spec.ts`     | 18    |
-| `parse-mongo-id.pipe.spec.ts`      | 6     |
+| Suite                           | Tests |
+| ------------------------------- | ----- |
+| `restaurantes.service.spec.ts`  | 25    |
+| `menu-items.service.spec.ts`    | 22    |
+| `ordenes.service.spec.ts`       | 36    |
+| `resenas.service.spec.ts`       | 32    |
+| `usuarios.service.spec.ts`      | 27    |
+| `reportes.service.spec.ts`      | 39    |
+| `files.service.spec.ts`         | 23    |
+| `seed.service.spec.ts`          | 6     |
+| `http-exception.filter.spec.ts` | 8     |
+| `response.interceptor.spec.ts`  | 18    |
+| `parse-mongo-id.pipe.spec.ts`   | 6     |
 
 ## Estructura
 
@@ -99,16 +100,16 @@ Los campos `Decimal128` de MongoDB se convierten automáticamente a `number` en 
 
 Documentación interactiva completa en **`/docs`** (Swagger). Resumen:
 
-| Módulo        | Prefijo              | Operaciones principales                                      |
-|---------------|----------------------|--------------------------------------------------------------|
-| Usuarios      | `/api/users`         | CRUD, login, $push/$pull en direcciones                     |
-| Restaurantes  | `/api/restaurants`   | CRUD, filtro geoespacial $near, búsqueda por texto          |
-| Menú          | `/api/menu-items`    | CRUD, updateMany disponibilidad, $addToSet/$pull en tags    |
-| Órdenes       | `/api/orders`        | CRUD con transacción ACID, cambio de estado                 |
-| Reseñas       | `/api/reviews`       | Create/delete, $addToSet/$pull en likes                     |
-| Reportes      | `/api/reports`       | 8 aggregation pipelines (revenue, top rated, best sellers…) |
-| Archivos      | `/api/files`         | GridFS upload/download/delete/list                          |
-| Seed          | `/api/seed`          | POST (poblar) / DELETE (limpiar)                            |
+| Módulo       | Prefijo            | Operaciones principales                                     |
+| ------------ | ------------------ | ----------------------------------------------------------- |
+| Usuarios     | `/api/users`       | CRUD, login, $push/$pull en direcciones                     |
+| Restaurantes | `/api/restaurants` | CRUD, filtro geoespacial $near, búsqueda por texto          |
+| Menú         | `/api/menu-items`  | CRUD, updateMany disponibilidad, $addToSet/$pull en tags    |
+| Órdenes      | `/api/orders`      | CRUD con transacción ACID, cambio de estado                 |
+| Reseñas      | `/api/reviews`     | Create/delete, $addToSet/$pull en likes                     |
+| Reportes     | `/api/reports`     | 8 aggregation pipelines (revenue, top rated, best sellers…) |
+| Archivos     | `/api/files`       | GridFS upload/download/delete/list                          |
+| Seed         | `/api/seed`        | POST (poblar) / DELETE (limpiar)                            |
 
 ## Build
 

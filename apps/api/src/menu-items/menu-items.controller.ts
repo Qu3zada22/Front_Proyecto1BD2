@@ -29,9 +29,21 @@ export class MenuItemsController {
   @Post('bulk')
   @ApiOperation({
     summary: 'Crear varios platillos',
-    description: 'Inserta múltiples platillos de un mismo restaurante en una sola operación (create con array).',
+    description:
+      'Inserta múltiples platillos de un mismo restaurante en una sola operación (create con array).',
   })
-  @ApiBody({ schema: { example: [{ restaurante_id: '...', nombre: 'Tacos', precio: 35, categoria: 'principal' }] } })
+  @ApiBody({
+    schema: {
+      example: [
+        {
+          restaurante_id: '...',
+          nombre: 'Tacos',
+          precio: 35,
+          categoria: 'principal',
+        },
+      ],
+    },
+  })
   createMany(@Body() dtos: CreateMenuItemDto[]) {
     return this.menuItemsService.createMany(dtos);
   }

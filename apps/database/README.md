@@ -68,10 +68,10 @@ apps/database/
 
 ## Índices creados (34 total)
 
-| Colección     | Índices                                                                                    |
-|---------------|--------------------------------------------------------------------------------------------|
-| `usuarios`    | email (unique), nombre (text), direcciones.ciudad (multikey), rol, rol+activo, preferencias, fecha_registro |
-| `restaurantes`| ubicacion (2dsphere), nombre+desc (text), categorias (multikey), propietario_id+activo, nombre+activo, calificacion_prom |
-| `menu_items`  | restaurante+categoria+disponible (ESR), etiquetas (multikey), nombre+desc (text), veces_ordenado, restaurante+disponible, restaurante+categoria, disponible |
-| `ordenes`     | usuario+estado+fecha (ESR), restaurante+estado+fecha (ESR), estado, estado+fecha, items.item_id (multikey), fecha_creacion |
-| `resenas`     | restaurante+calificacion, usuario_id, fecha, tags (multikey), titulo+comentario (text), orden_id, likes (multikey), activa |
+| Colección      | Índices                                                                                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usuarios`     | email (unique), nombre (text), direcciones.ciudad (multikey), rol, rol+activo, preferencias, fecha_registro                                                 |
+| `restaurantes` | ubicacion (2dsphere), nombre+desc (text), categorias (multikey), propietario_id+activo, nombre+activo, calificacion_prom                                    |
+| `menu_items`   | restaurante+categoria+disponible (ESR), etiquetas (multikey), nombre+desc (text), veces_ordenado, restaurante+disponible, restaurante+categoria, disponible |
+| `ordenes`      | usuario+estado+fecha (ESR), restaurante+estado+fecha (ESR), estado, estado+fecha, items.item_id (multikey), fecha_creacion                                  |
+| `resenas`      | restaurante+calificacion, usuario_id, fecha, tags (multikey), titulo+comentario (text), orden_id, likes (multikey), activa                                  |
