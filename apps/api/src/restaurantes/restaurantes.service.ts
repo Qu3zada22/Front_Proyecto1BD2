@@ -15,10 +15,18 @@ export class RestaurantesService {
   constructor(
     @InjectModel(Restaurante.name)
     private restauranteModel: Model<RestauranteDocument>,
-    @InjectModel(MenuItem.name) private menuItemModel: Model<any>,
-    @InjectModel(Orden.name) private ordenModel: Model<any>,
-    @InjectModel(Usuario.name) private usuarioModel: Model<any>,
-    @InjectConnection() private connection: Connection,
+
+    @InjectModel(MenuItem.name)
+    private menuItemModel: Model<any>,
+
+    @InjectModel(Orden.name)
+    private ordenModel: Model<any>,
+
+    @InjectModel(Usuario.name)
+    private usuarioModel: Model<any>,
+
+    @InjectConnection()
+    private connection: Connection,
   ) {}
 
   async create(data: any): Promise<RestauranteDocument> {
@@ -30,7 +38,8 @@ export class RestaurantesService {
         throw new BadRequestException('El propietario referenciado no existe');
     }
     const doc = { ...data };
-    if (doc.img_portada_id) doc.img_portada_id = new Types.ObjectId(doc.img_portada_id);
+    if (doc.img_portada_id)
+      doc.img_portada_id = new Types.ObjectId(doc.img_portada_id);
     return this.restauranteModel.create(doc);
   }
 
