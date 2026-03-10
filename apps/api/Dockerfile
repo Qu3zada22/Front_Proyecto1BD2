@@ -32,6 +32,7 @@ ENV NODE_ENV=production
 # Sólo dependencias de producción
 COPY package*.json ./
 COPY apps/api/package*.json ./apps/api/
+COPY apps/database/package*.json ./apps/database/
 RUN npm ci --omit=dev
 
 # Artefactos compilados
