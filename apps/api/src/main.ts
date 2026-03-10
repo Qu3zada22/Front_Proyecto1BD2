@@ -58,6 +58,12 @@ async function bootstrap() {
     );
   }
 
+  // Health check — fuera del prefix /api para Docker y load balancers
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.get('/health', (_req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   console.log(
