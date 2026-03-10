@@ -372,4 +372,4 @@ Documentación interactiva: **http://localhost:3000/docs** (solo en desarrollo).
 
 ## Video
 
-[![VIDEO](https://youtu.be/O8Sstw9-qDw)]
+[![VIDEO](https://i.ytimg.com/vi/TBM4eAqOT0k/maxresdefault.jpg)](https://youtu.be/O8Sstw9-qDw)
