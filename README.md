@@ -2,6 +2,8 @@
 
 Sistema de gestión de pedidos y reseñas de restaurantes — Proyecto 1, CC3089 Base de Datos 2, UVG Semestre I 2026.
 
+> Producción: https://fastpochi.jonialen.com
+
 ## Estructura del proyecto
 
 ```
