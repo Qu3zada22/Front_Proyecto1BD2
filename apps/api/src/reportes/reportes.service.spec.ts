@@ -38,7 +38,10 @@ describe('ReportesService', () => {
       providers: [
         ReportesService,
         { provide: getModelToken(Orden.name), useValue: mockOrdenModel },
-        { provide: getModelToken(Restaurante.name), useValue: mockRestauranteModel },
+        {
+          provide: getModelToken(Restaurante.name),
+          useValue: mockRestauranteModel,
+        },
         { provide: getModelToken(MenuItem.name), useValue: mockMenuItemModel },
         { provide: getModelToken(Resena.name), useValue: mockResenaModel },
         { provide: getModelToken(Usuario.name), useValue: mockUsuarioModel },
@@ -70,7 +73,9 @@ describe('ReportesService', () => {
       // Must sort by total descending
       expect(pipeline[1]).toEqual({ $sort: { total: -1 } });
       // Must project _id → estado (OBS-04)
-      expect(pipeline[2]).toEqual({ $project: { estado: '$_id', total: 1, _id: 0 } });
+      expect(pipeline[2]).toEqual({
+        $project: { estado: '$_id', total: 1, _id: 0 },
+      });
       expect(result).toEqual(expected);
     });
   });
@@ -129,7 +134,9 @@ describe('ReportesService', () => {
         $group: { _id: '$rol', total: { $sum: 1 } },
       });
       // Must project _id → rol (OBS-04)
-      expect(pipeline[1]).toEqual({ $project: { rol: '$_id', total: 1, _id: 0 } });
+      expect(pipeline[1]).toEqual({
+        $project: { rol: '$_id', total: 1, _id: 0 },
+      });
       expect(result).toEqual(expected);
     });
   });
@@ -139,7 +146,13 @@ describe('ReportesService', () => {
 
   describe('topRestaurantes', () => {
     it('should start pipeline from resenas collection (not restaurantes)', async () => {
-      const expected = [{ nombre: 'Pizza Palace', avg_calificacion: 4.9, cantidad_resenas: 120 }];
+      const expected = [
+        {
+          nombre: 'Pizza Palace',
+          avg_calificacion: 4.9,
+          cantidad_resenas: 120,
+        },
+      ];
       mockResenaModel.aggregate.mockResolvedValue(expected);
 
       const result = await service.topRestaurantes(5);
@@ -171,7 +184,9 @@ describe('ReportesService', () => {
 
       expect(groupStage).toBeDefined();
       expect(groupStage.$group._id).toBe('$restaurante_id');
-      expect(groupStage.$group.avg_calificacion).toEqual({ $avg: '$calificacion' });
+      expect(groupStage.$group.avg_calificacion).toEqual({
+        $avg: '$calificacion',
+      });
       expect(groupStage.$group.cantidad_resenas).toEqual({ $sum: 1 });
     });
 
@@ -183,9 +198,13 @@ describe('ReportesService', () => {
       const pipeline = mockResenaModel.aggregate.mock.calls[0][0];
       const groupIdx = pipeline.findIndex((s: any) => s.$group !== undefined);
       // second $match must come after $group
-      const secondMatch = pipeline.slice(groupIdx + 1).find((s: any) => s.$match !== undefined);
+      const secondMatch = pipeline
+        .slice(groupIdx + 1)
+        .find((s: any) => s.$match !== undefined);
 
-      expect(secondMatch).toEqual({ $match: { cantidad_resenas: { $gte: 5 } } });
+      expect(secondMatch).toEqual({
+        $match: { cantidad_resenas: { $gte: 5 } },
+      });
     });
 
     it('should sort by avg_calificacion desc then cantidad_resenas desc', async () => {
@@ -196,7 +215,9 @@ describe('ReportesService', () => {
       const pipeline = mockResenaModel.aggregate.mock.calls[0][0];
       const sortStage = pipeline.find((s: any) => s.$sort !== undefined);
 
-      expect(sortStage).toEqual({ $sort: { avg_calificacion: -1, cantidad_resenas: -1 } });
+      expect(sortStage).toEqual({
+        $sort: { avg_calificacion: -1, cantidad_resenas: -1 },
+      });
     });
 
     it('should apply the limit argument', async () => {
@@ -241,7 +262,9 @@ describe('ReportesService', () => {
 
   describe('platillosMasVendidos', () => {
     it('should match only entregado orders and unwind items', async () => {
-      const expected = [{ nombre: 'Burger', total_vendidos: 500, ingresos: 22500 }];
+      const expected = [
+        { nombre: 'Burger', total_vendidos: 500, ingresos: 22500 },
+      ];
       mockOrdenModel.aggregate.mockResolvedValue(expected);
 
       const result = await service.platillosMasVendidos(5);
@@ -281,7 +304,9 @@ describe('ReportesService', () => {
       const pipeline = mockOrdenModel.aggregate.mock.calls[0][0];
       const groupStage = pipeline.find((s: any) => s.$group !== undefined);
 
-      expect(groupStage.$group.total_vendidos).toEqual({ $sum: '$items.cantidad' });
+      expect(groupStage.$group.total_vendidos).toEqual({
+        $sum: '$items.cantidad',
+      });
     });
 
     it('should compute ingresos from items.subtotal using $toDecimal (preserva precisión Decimal128)', async () => {
@@ -325,7 +350,9 @@ describe('ReportesService', () => {
 
   describe('ingresosPorDia', () => {
     it('should match by fecha_creacion field (NOT createdAt) within date range', async () => {
-      const expected = [{ fecha: '2026-03-01', total_ingresos: 1500, total_ordenes: 30 }];
+      const expected = [
+        { fecha: '2026-03-01', total_ingresos: 1500, total_ordenes: 30 },
+      ];
       mockOrdenModel.aggregate.mockResolvedValue(expected);
 
       const result = await service.ingresosPorDia('2026-03-01', '2026-03-07');
@@ -339,7 +366,7 @@ describe('ReportesService', () => {
 
       // Must use fecha_creacion field, NOT createdAt
       expect(matchStage.$match.fecha_creacion).toBeDefined();
-      expect((matchStage.$match as any).createdAt).toBeUndefined();
+      expect(matchStage.$match.createdAt).toBeUndefined();
 
       // fecha_creacion must have $gte and $lte date range
       expect(matchStage.$match.fecha_creacion.$gte).toBeInstanceOf(Date);
@@ -498,7 +525,9 @@ describe('ReportesService', () => {
       // The condition must check $lt mes < 10
       expect(paddedMonth.$cond[0]).toEqual({ $lt: ['$_id.mes', 10] });
       // If < 10: prepend '0'
-      expect(paddedMonth.$cond[1]).toMatchObject({ $concat: ['0', expect.anything()] });
+      expect(paddedMonth.$cond[1]).toMatchObject({
+        $concat: ['0', expect.anything()],
+      });
     });
 
     it('should sort by year desc, month desc, total_ingresos desc', async () => {
@@ -542,7 +571,9 @@ describe('ReportesService', () => {
       expect(pipeline[2]).toEqual({ $sort: { total: -1 } });
 
       // Stage 3: project _id → categoria (OBS-03)
-      expect(pipeline[3]).toEqual({ $project: { categoria: '$_id', total: 1, _id: 0 } });
+      expect(pipeline[3]).toEqual({
+        $project: { categoria: '$_id', total: 1, _id: 0 },
+      });
 
       expect(result).toEqual(expected);
     });
@@ -625,7 +656,11 @@ describe('ReportesService', () => {
 
     it('should return aggregation results', async () => {
       const expected = [
-        { usuario: { nombre: 'Ana', email: 'ana@example.com' }, total_gastado: 5000, total_ordenes: 42 },
+        {
+          usuario: { nombre: 'Ana', email: 'ana@example.com' },
+          total_gastado: 5000,
+          total_ordenes: 42,
+        },
       ];
       mockOrdenModel.aggregate.mockResolvedValue(expected);
 

@@ -35,7 +35,10 @@ describe('AllExceptionsFilter', () => {
       const { switchToHttp, mockStatus, mockJson } = makeHost('/api/users');
       const host = { switchToHttp } as any;
 
-      filter.catch(new HttpException('Recurso no encontrado', HttpStatus.NOT_FOUND), host);
+      filter.catch(
+        new HttpException('Recurso no encontrado', HttpStatus.NOT_FOUND),
+        host,
+      );
 
       expect(mockStatus).toHaveBeenCalledWith(404);
       expect(mockJson).toHaveBeenCalledWith(

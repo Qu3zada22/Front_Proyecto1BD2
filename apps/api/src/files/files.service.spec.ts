@@ -86,23 +86,30 @@ describe('FilesService', () => {
 
     it('should open an upload stream with the original filename', async () => {
       // Simulate the stream 'finish' event
-      mockUploadStream.on.mockImplementation((event: string, cb: () => void) => {
-        if (event === 'finish') setTimeout(cb, 0);
-        return mockUploadStream;
-      });
+      mockUploadStream.on.mockImplementation(
+        (event: string, cb: () => void) => {
+          if (event === 'finish') setTimeout(cb, 0);
+          return mockUploadStream;
+        },
+      );
 
       await service.upload(mockFile);
 
-      expect(mockBucket.openUploadStream).toHaveBeenCalledWith('photo.png', expect.objectContaining({
-        metadata: expect.objectContaining({ contentType: 'image/png' }),
-      }));
+      expect(mockBucket.openUploadStream).toHaveBeenCalledWith(
+        'photo.png',
+        expect.objectContaining({
+          metadata: expect.objectContaining({ contentType: 'image/png' }),
+        }),
+      );
     });
 
     it('should resolve with the file id and filename on success', async () => {
-      mockUploadStream.on.mockImplementation((event: string, cb: () => void) => {
-        if (event === 'finish') setTimeout(cb, 0);
-        return mockUploadStream;
-      });
+      mockUploadStream.on.mockImplementation(
+        (event: string, cb: () => void) => {
+          if (event === 'finish') setTimeout(cb, 0);
+          return mockUploadStream;
+        },
+      );
 
       const result = await service.upload(mockFile);
 
@@ -110,10 +117,12 @@ describe('FilesService', () => {
     });
 
     it('should include metadata with contentType and uploadedAt in the upload stream options', async () => {
-      mockUploadStream.on.mockImplementation((event: string, cb: () => void) => {
-        if (event === 'finish') setTimeout(cb, 0);
-        return mockUploadStream;
-      });
+      mockUploadStream.on.mockImplementation(
+        (event: string, cb: () => void) => {
+          if (event === 'finish') setTimeout(cb, 0);
+          return mockUploadStream;
+        },
+      );
 
       await service.upload(mockFile);
 
@@ -129,62 +138,87 @@ describe('FilesService', () => {
     const validId = '507f1f77bcf86cd799439011';
 
     it('should throw NotFoundException for an invalid ObjectId', async () => {
-      await expect(service.getFile('not-an-id', {} as any)).rejects.toThrow(NotFoundException);
-      await expect(service.getFile('not-an-id', {} as any)).rejects.toThrow('ID de archivo inválido');
+      await expect(service.getFile('not-an-id', {} as any)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.getFile('not-an-id', {} as any)).rejects.toThrow(
+        'ID de archivo inválido',
+      );
     });
 
     it('should throw NotFoundException when no file is found in GridFS', async () => {
       mockFindCursor.toArray.mockResolvedValue([]);
 
-      await expect(service.getFile(validId, {} as any)).rejects.toThrow(NotFoundException);
-      await expect(service.getFile(validId, {} as any)).rejects.toThrow('Archivo no encontrado');
+      await expect(service.getFile(validId, {} as any)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.getFile(validId, {} as any)).rejects.toThrow(
+        'Archivo no encontrado',
+      );
     });
 
     it('should set Content-Type header from file metadata when present', async () => {
       const mockRes = { setHeader: jest.fn() } as any;
-      mockFindCursor.toArray.mockResolvedValue([{
-        filename: 'photo.png',
-        metadata: { contentType: 'image/png' },
-      }]);
+      mockFindCursor.toArray.mockResolvedValue([
+        {
+          filename: 'photo.png',
+          metadata: { contentType: 'image/png' },
+        },
+      ]);
       mockDownloadStream.pipe.mockReturnValue({});
 
       await service.getFile(validId, mockRes);
 
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'image/png');
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        'image/png',
+      );
     });
 
     it('should infer Content-Type from filename extension when metadata is absent', async () => {
       const mockRes = { setHeader: jest.fn() } as any;
-      mockFindCursor.toArray.mockResolvedValue([{
-        filename: 'image.webp',
-        metadata: {},
-      }]);
+      mockFindCursor.toArray.mockResolvedValue([
+        {
+          filename: 'image.webp',
+          metadata: {},
+        },
+      ]);
       mockDownloadStream.pipe.mockReturnValue({});
 
       await service.getFile(validId, mockRes);
 
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'image/webp');
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        'image/webp',
+      );
     });
 
     it('should fall back to application/octet-stream for unknown extensions', async () => {
       const mockRes = { setHeader: jest.fn() } as any;
-      mockFindCursor.toArray.mockResolvedValue([{
-        filename: 'data.bin',
-        metadata: {},
-      }]);
+      mockFindCursor.toArray.mockResolvedValue([
+        {
+          filename: 'data.bin',
+          metadata: {},
+        },
+      ]);
       mockDownloadStream.pipe.mockReturnValue({});
 
       await service.getFile(validId, mockRes);
 
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'application/octet-stream');
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        'application/octet-stream',
+      );
     });
 
     it('should set Content-Disposition inline header with the filename', async () => {
       const mockRes = { setHeader: jest.fn() } as any;
-      mockFindCursor.toArray.mockResolvedValue([{
-        filename: 'menu.pdf',
-        metadata: { contentType: 'application/pdf' },
-      }]);
+      mockFindCursor.toArray.mockResolvedValue([
+        {
+          filename: 'menu.pdf',
+          metadata: { contentType: 'application/pdf' },
+        },
+      ]);
       mockDownloadStream.pipe.mockReturnValue({});
 
       await service.getFile(validId, mockRes);
@@ -197,10 +231,12 @@ describe('FilesService', () => {
 
     it('should pipe the download stream to the response', async () => {
       const mockRes = { setHeader: jest.fn() } as any;
-      mockFindCursor.toArray.mockResolvedValue([{
-        filename: 'photo.jpg',
-        metadata: { contentType: 'image/jpeg' },
-      }]);
+      mockFindCursor.toArray.mockResolvedValue([
+        {
+          filename: 'photo.jpg',
+          metadata: { contentType: 'image/jpeg' },
+        },
+      ]);
 
       await service.getFile(validId, mockRes);
 
@@ -226,8 +262,12 @@ describe('FilesService', () => {
     it('should throw NotFoundException when bucket.delete rejects', async () => {
       mockBucket.delete.mockRejectedValue(new Error('not found in bucket'));
 
-      await expect(service.deleteFile(validId)).rejects.toThrow(NotFoundException);
-      await expect(service.deleteFile(validId)).rejects.toThrow('Archivo no encontrado');
+      await expect(service.deleteFile(validId)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.deleteFile(validId)).rejects.toThrow(
+        'Archivo no encontrado',
+      );
     });
   });
 
@@ -278,7 +318,10 @@ describe('FilesService', () => {
 
         await service.getFile('507f1f77bcf86cd799439011', mockRes);
 
-        expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', expectedMime);
+        expect(mockRes.setHeader).toHaveBeenCalledWith(
+          'Content-Type',
+          expectedMime,
+        );
       });
     });
   });

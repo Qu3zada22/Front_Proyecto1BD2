@@ -1,0 +1,39 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          envs: MONGODB_ATLAS_URI
+          script: |
+            set -e
+            if [ ! -d ~/fastpochi ]; then
+              git clone git@github.com:Qu3zada22/Front_Proyecto1BD2.git ~/fastpochi
+            fi
+            cd ~/fastpochi
+            git pull origin main
+
+            # Escribir .env.prod con los secretos (nunca se commitea al repo)
+            echo "MONGODB_URI=${MONGODB_ATLAS_URI}" > .env.prod
+
+            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+            docker image prune -f
+            echo "Deploy completado: $(date)"
+        env:
+          MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI }}

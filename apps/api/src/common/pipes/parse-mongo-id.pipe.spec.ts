@@ -16,7 +16,9 @@ describe('ParseMongoIdPipe', () => {
 
   it('should throw BadRequestException for a random non-hex string', () => {
     expect(() => pipe.transform('not-an-id')).toThrow(BadRequestException);
-    expect(() => pipe.transform('not-an-id')).toThrow("'not-an-id' no es un ObjectId válido");
+    expect(() => pipe.transform('not-an-id')).toThrow(
+      "'not-an-id' no es un ObjectId válido",
+    );
   });
 
   it('should throw BadRequestException for a string that is too short', () => {
@@ -34,6 +36,8 @@ describe('ParseMongoIdPipe', () => {
 
   it('should include the invalid value in the error message', () => {
     const badId = 'invalid-id-value';
-    expect(() => pipe.transform(badId)).toThrow(`'${badId}' no es un ObjectId válido`);
+    expect(() => pipe.transform(badId)).toThrow(
+      `'${badId}' no es un ObjectId válido`,
+    );
   });
 });

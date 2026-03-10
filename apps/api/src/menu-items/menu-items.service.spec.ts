@@ -94,8 +94,12 @@ describe('MenuItemsService', () => {
         categoria: 'principal' as const,
       };
 
-      await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
-      await expect(service.create(dto as any)).rejects.toThrow('El restaurante referenciado no existe o está inactivo');
+      await expect(service.create(dto as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create(dto as any)).rejects.toThrow(
+        'El restaurante referenciado no existe o está inactivo',
+      );
       expect(mockModel.create).not.toHaveBeenCalled();
     });
 
@@ -108,8 +112,12 @@ describe('MenuItemsService', () => {
         categoria: 'principal' as const,
       };
 
-      await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
-      await expect(service.create(dto as any)).rejects.toThrow('El restaurante referenciado no existe o está inactivo');
+      await expect(service.create(dto as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create(dto as any)).rejects.toThrow(
+        'El restaurante referenciado no existe o está inactivo',
+      );
     });
   });
 
@@ -143,7 +151,9 @@ describe('MenuItemsService', () => {
 
       const result = await service.findAll({});
 
-      expect(mockModel.find).toHaveBeenCalledWith(expect.objectContaining({ disponible: true }));
+      expect(mockModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({ disponible: true }),
+      );
       expect(query.sort).toHaveBeenCalledWith({ categoria: 1, nombre: 1 });
       expect(query.skip).toHaveBeenCalledWith(0);
       expect(query.limit).toHaveBeenCalledWith(50);
@@ -216,8 +226,12 @@ describe('MenuItemsService', () => {
       const query = createMockQuery(null);
       mockModel.findById.mockReturnValue(query);
 
-      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
-      await expect(service.findOne('nonexistent')).rejects.toThrow('Item no encontrado');
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        'Item no encontrado',
+      );
     });
   });
 
@@ -243,8 +257,12 @@ describe('MenuItemsService', () => {
       const query = createMockQuery(null);
       mockModel.findByIdAndUpdate.mockReturnValue(query);
 
-      await expect(service.update('nonexistent', {} as any)).rejects.toThrow(NotFoundException);
-      await expect(service.update('nonexistent', {} as any)).rejects.toThrow('Item no encontrado');
+      await expect(service.update('nonexistent', {} as any)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.update('nonexistent', {} as any)).rejects.toThrow(
+        'Item no encontrado',
+      );
     });
   });
 
@@ -257,7 +275,9 @@ describe('MenuItemsService', () => {
       const query = createMockQuery(execResult);
       mockModel.updateMany.mockReturnValue(query);
 
-      const result = await service.updateMany(restauranteId, { disponible: false } as any);
+      const result = await service.updateMany(restauranteId, {
+        disponible: false,
+      } as any);
 
       const callArgs = mockModel.updateMany.mock.calls[0];
       expect(callArgs[0].restaurante_id).toBeInstanceOf(Types.ObjectId);
@@ -284,8 +304,12 @@ describe('MenuItemsService', () => {
       const query = createMockQuery(null);
       mockModel.findByIdAndDelete.mockReturnValue(query);
 
-      await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
-      await expect(service.remove('nonexistent')).rejects.toThrow('Item no encontrado');
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        'Item no encontrado',
+      );
     });
   });
 
@@ -300,7 +324,9 @@ describe('MenuItemsService', () => {
 
       const result = await service.removeByRestaurant(restauranteId);
 
-      expect(mockModel.deleteMany).toHaveBeenCalledWith({ restaurante_id: new Types.ObjectId(restauranteId) });
+      expect(mockModel.deleteMany).toHaveBeenCalledWith({
+        restaurante_id: new Types.ObjectId(restauranteId),
+      });
       expect(result).toEqual({ deleted: 8 });
     });
   });
@@ -327,8 +353,12 @@ describe('MenuItemsService', () => {
       const query = createMockQuery(null);
       mockModel.findByIdAndUpdate.mockReturnValue(query);
 
-      await expect(service.addTag('nonexistent', 'vegano')).rejects.toThrow(NotFoundException);
-      await expect(service.addTag('nonexistent', 'vegano')).rejects.toThrow('Item no encontrado');
+      await expect(service.addTag('nonexistent', 'vegano')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.addTag('nonexistent', 'vegano')).rejects.toThrow(
+        'Item no encontrado',
+      );
     });
   });
 
@@ -354,8 +384,12 @@ describe('MenuItemsService', () => {
       const query = createMockQuery(null);
       mockModel.findByIdAndUpdate.mockReturnValue(query);
 
-      await expect(service.removeTag('nonexistent', 'vegano')).rejects.toThrow(NotFoundException);
-      await expect(service.removeTag('nonexistent', 'vegano')).rejects.toThrow('Item no encontrado');
+      await expect(service.removeTag('nonexistent', 'vegano')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.removeTag('nonexistent', 'vegano')).rejects.toThrow(
+        'Item no encontrado',
+      );
     });
   });
 });
