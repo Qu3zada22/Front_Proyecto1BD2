@@ -367,3 +367,9 @@ Documentación interactiva: **http://localhost:3000/docs** (solo en desarrollo).
 | `cliente`     | Ver restaurantes, hacer pedidos, escribir reseñas |
 | `propietario` | Gestionar sus restaurantes y menú, ver pedidos    |
 | `admin`       | Acceso total, reportes, gestión de usuarios       |
+
+---
+
+## Video
+
+[![VIDEO](https://youtu.be/O8Sstw9-qDw)]
