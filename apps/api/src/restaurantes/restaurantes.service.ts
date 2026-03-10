@@ -29,7 +29,9 @@ export class RestaurantesService {
       if (!ownerExists)
         throw new BadRequestException('El propietario referenciado no existe');
     }
-    return this.restauranteModel.create(data);
+    const doc = { ...data };
+    if (doc.img_portada_id) doc.img_portada_id = new Types.ObjectId(doc.img_portada_id);
+    return this.restauranteModel.create(doc);
   }
 
   async findAll(query: {

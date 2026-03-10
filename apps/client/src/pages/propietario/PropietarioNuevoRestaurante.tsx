@@ -11,6 +11,7 @@ import { PreferenceTags } from "@/components/fastpochi/preference-tags"
 import { RESTAURANT_CATEGORIES } from "@/lib/mock-data"
 import type { HorarioDia } from "@/lib/mock-data"
 import { useAuth, useData } from "@/lib/store"
+import { api } from "@/lib/api"
 
 const DIAS: { key: string; label: string }[] = [
   { key: "lunes", label: "Lunes" },
@@ -49,38 +50,60 @@ export default function PropietarioNuevoRestaurante() {
   const [horario, setHorario] = useState<Record<string, HorarioDia>>(DEFAULT_HORARIO)
   const [lat, setLat] = useState("14.6349")
   const [lng, setLng] = useState("-90.5069")
-  // Mock GridFS: store preview URL (real backend would POST file → get ObjectId)
   const [imgPreview, setImgPreview] = useState<string>(
     "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=400&fit=crop"
   )
+  const [uploadedImgId, setUploadedImgId] = useState<string | null>(null)
+  const [uploadingImg, setUploadingImg] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    // Simulate GridFS upload — real backend: POST /api/gridfs/upload → returns img_portada_id
-    const previewUrl = URL.createObjectURL(file)
-    setImgPreview(previewUrl)
+    setImgPreview(URL.createObjectURL(file))
+    setUploadingImg(true)
+    try {
+      const result = await api.uploadFile(file)
+      setUploadedImgId(result.id)
+    } catch (err) {
+      console.error("Error subiendo imagen:", err)
+    } finally {
+      setUploadingImg(false)
+    }
   }
 
   const updateDia = (dia: string, field: keyof HorarioDia, value: string | boolean) => {
     setHorario((prev) => ({ ...prev, [dia]: { ...prev[dia], [field]: value } }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user || categorias.length === 0) return
-    addRestaurante({
-      propietario_id: user._id,
-      nombre,
-      descripcion,
-      ubicacion: { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] },
-      direccion: { calle, ciudad, pais, codigo_postal: codigoPostal },
-      categorias,
-      horario,
-      telefono,
-      img_portada: imgPreview,
-    })
-    navigate("/propietario")
+    setSaving(true)
+    try {
+      const data: any = {
+        propietario_id: user._id,
+        nombre,
+        descripcion,
+        ubicacion: { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] },
+        direccion: { calle, ciudad, pais, codigo_postal: codigoPostal },
+        categorias,
+        horario,
+        telefono,
+      }
+      if (uploadedImgId) {
+        data.img_portada_id = uploadedImgId
+        data.img_portada = `/api/files/${uploadedImgId}`
+      } else {
+        data.img_portada = imgPreview
+      }
+      await addRestaurante(data)
+      navigate("/propietario")
+    } catch (err) {
+      console.error("Error creando restaurante:", err)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -104,10 +127,10 @@ export default function PropietarioNuevoRestaurante() {
               }
             </div>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-            <Button type="button" variant="outline" size="sm" className="gap-2 self-start" onClick={() => fileInputRef.current?.click()}>
-              <Upload size={14} /> Subir imagen
+            <Button type="button" variant="outline" size="sm" className="gap-2 self-start" onClick={() => fileInputRef.current?.click()} disabled={uploadingImg}>
+              <Upload size={14} /> {uploadingImg ? "Subiendo..." : "Subir imagen"}
             </Button>
-            <p className="text-xs text-muted-foreground">En el backend este archivo se guardará en GridFS y se almacenará el ObjectId en img_portada_id.</p>
+            {uploadedImgId && <p className="text-xs text-green-600">Imagen subida correctamente.</p>}
           </CardContent>
         </Card>
 
@@ -218,8 +241,8 @@ export default function PropietarioNuevoRestaurante() {
           </CardContent>
         </Card>
 
-        <Button type="submit" className="w-full" disabled={categorias.length === 0}>
-          Crear Restaurante
+        <Button type="submit" className="w-full" disabled={categorias.length === 0 || saving || uploadingImg}>
+          {saving ? "Creando..." : "Crear Restaurante"}
         </Button>
       </form>
     </div>
