@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState, useEffect } from "react"
-import { Users, Store, ShoppingBag, Tag, Loader2 } from "lucide-react"
+import { useMemo, useReducer, useState, useEffect } from "react"
+import { Users, Store, ShoppingBag, Tag } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { StarRating } from "@/components/fastpochi/star-rating"
@@ -41,28 +41,45 @@ interface TopUsuario {
 // Los endpoints devuelven { success: true, data: [...] }
 // así que extraemos .data automáticamente
 
+type FetchState<T> = { data: T; loading: boolean; error: string | null }
+type FetchAction<T> =
+  | { type: 'start' }
+  | { type: 'success'; payload: T }
+  | { type: 'error'; message: string }
+
+function fetchReducer<T>(state: FetchState<T>, action: FetchAction<T>): FetchState<T> {
+  switch (action.type) {
+    case 'start':   return { ...state, loading: true, error: null }
+    case 'success': return { data: action.payload, loading: false, error: null }
+    case 'error':   return { ...state, loading: false, error: action.message }
+  }
+}
+
 function useFetch<T>(url: string, defaultValue: T) {
-  const [data, setData]       = useState<T>(defaultValue)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [state, dispatch] = useReducer(fetchReducer as (s: FetchState<T>, a: FetchAction<T>) => FetchState<T>, {
+    data: defaultValue,
+    loading: true,
+    error: null,
+  })
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
+    let cancelled = false
+    dispatch({ type: 'start' })
     fetch(url)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
       .then((json) => {
-        // Soporta tanto { success, data } como respuesta directa
-        setData(json?.data ?? json)
+        if (!cancelled) dispatch({ type: 'success', payload: json?.data ?? json })
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
+      .catch((err) => {
+        if (!cancelled) dispatch({ type: 'error', message: err.message })
+      })
+    return () => { cancelled = true }
   }, [url])
 
-  return { data, loading, error }
+  return state
 }
 
 // ── Skeleton / Error ───────────────────────────────────────────────────────────
@@ -105,7 +122,7 @@ export default function AdminDashboard() {
   const topUsers = useFetch<TopUsuario[]>('/api/reports/users/top-spenders?limit=10', [])
 
   // Agregaciones simples
-  const { data: ordenesPorEstado } = useFetch<{ estado: string; total: number }[]>('/api/reports/orders/by-status', [])
+  const { data: _ordenesPorEstado } = useFetch<{ estado: string; total: number }[]>('/api/reports/orders/by-status', [])
   const { data: totalOrdenesData } = useFetch<{ total: number }>('/api/reports/orders/count', { total: 0 })
   const { data: categorias }       = useFetch<string[]>('/api/reports/restaurants/categories/distinct', [])
   const { data: usuariosPorRol }   = useFetch<{ rol: string; total: number }[]>('/api/reports/users/by-role', [])
@@ -116,7 +133,7 @@ export default function AdminDashboard() {
 
   const stats = [
     { label: "Usuarios Activos",        value: activeUsers,           icon: Users,       color: "text-primary",     bg: "bg-primary/10" },
-    { label: "Restaurantes c/ Reseñas", value: topRest.data.length,   icon: Store,       color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Restaurantes Activos", value: topRest.data.length,   icon: Store,       color: "text-emerald-500", bg: "bg-emerald-500/10" },
     { label: "Total de Órdenes",        value: totalOrdenes,          icon: ShoppingBag, color: "text-amber-500",   bg: "bg-amber-500/10" },
     { label: "Categorías Disponibles",  value: totalCategorias,       icon: Tag,         color: "text-violet-500",  bg: "bg-violet-500/10" },
   ]
