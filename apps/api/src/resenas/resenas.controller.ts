@@ -18,18 +18,25 @@ import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 export class ResenasController {
   constructor(private readonly resenasService: ResenasService) {}
 
-    @Post()
-    @ApiOperation({ summary: 'Crear reseña', description: 'Crea una reseña vinculada a restaurante y/o orden.' })
-    create(@Body() dto: CreateResenaDto) {
-        return this.resenasService.create(dto);
-    }
+  @Post()
+  @ApiOperation({
+    summary: 'Crear reseña',
+    description: 'Crea una reseña vinculada a restaurante y/o orden.',
+  })
+  create(@Body() dto: CreateResenaDto) {
+    return this.resenasService.create(dto);
+  }
 
-    @Get('user/:userId')
-    @ApiOperation({ summary: 'Reseñas de un usuario', description: 'Retorna todas las reseñas activas de un cliente ordenadas por fecha.' })
-    @ApiParam({ name: 'userId', description: 'ObjectId del usuario' })
-    findByUser(@Param('userId', ParseMongoIdPipe) userId: string) {
-        return this.resenasService.findByUser(userId);
-    }
+  @Get('user/:userId')
+  @ApiOperation({
+    summary: 'Reseñas de un usuario',
+    description:
+      'Retorna todas las reseñas activas de un cliente ordenadas por fecha.',
+  })
+  @ApiParam({ name: 'userId', description: 'ObjectId del usuario' })
+  findByUser(@Param('userId', ParseMongoIdPipe) userId: string) {
+    return this.resenasService.findByUser(userId);
+  }
 
   @Get('restaurant/:id')
   @ApiOperation({

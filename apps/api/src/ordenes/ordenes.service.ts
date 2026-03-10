@@ -110,17 +110,19 @@ export class OrdenesService {
       });
       const total = itemsMapped.reduce((sum, i) => sum + i.subtotal, 0);
 
-            const [orden] = await this.ordenModel.create(
-                [{
-                    usuario_id: new Types.ObjectId(dto.usuario_id),
-                    restaurante_id: new Types.ObjectId(dto.restaurante_id),
-                    items: itemsMapped,
-                    total,
-                    direccion_entrega: dto.direccion_entrega,
-                    notas: dto.notas,
-                }],
-                { session },
-            );
+      const [orden] = await this.ordenModel.create(
+        [
+          {
+            usuario_id: new Types.ObjectId(dto.usuario_id),
+            restaurante_id: new Types.ObjectId(dto.restaurante_id),
+            items: itemsMapped,
+            total,
+            direccion_entrega: dto.direccion_entrega,
+            notas: dto.notas,
+          },
+        ],
+        { session },
+      );
 
       // bulkWrite: $inc veces_ordenado en cada menu_item de la orden
       const bulkOps = itemsMapped.map((item) => ({
@@ -144,20 +146,21 @@ export class OrdenesService {
     }
   }
 
-    async findAll(query: {
-        cliente_id?: string;
-        restaurante_id?: string;
-        estado?: string;
-        skip?: number;
-        limit?: number;
-    }): Promise<any[]> {
-        const filter: any = {};
-        if (query.cliente_id) {
-            const oid = new Types.ObjectId(query.cliente_id);
-            filter.$or = [{ usuario_id: oid }, { usuario_id: query.cliente_id }];
-        }
-        if (query.restaurante_id) filter.restaurante_id = new Types.ObjectId(query.restaurante_id);
-        if (query.estado) filter.estado = query.estado;
+  async findAll(query: {
+    cliente_id?: string;
+    restaurante_id?: string;
+    estado?: string;
+    skip?: number;
+    limit?: number;
+  }): Promise<any[]> {
+    const filter: any = {};
+    if (query.cliente_id) {
+      const oid = new Types.ObjectId(query.cliente_id);
+      filter.$or = [{ usuario_id: oid }, { usuario_id: query.cliente_id }];
+    }
+    if (query.restaurante_id)
+      filter.restaurante_id = new Types.ObjectId(query.restaurante_id);
+    if (query.estado) filter.estado = query.estado;
 
     return this.ordenModel
       .find(filter)

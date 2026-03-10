@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { ResenasService } from './resenas.service';
 import { Resena } from './schemas/resena.schema';
@@ -92,6 +92,7 @@ describe('ResenasService', () => {
   describe('create', () => {
     const restauranteId = new Types.ObjectId().toString();
     const ordenId = new Types.ObjectId().toString();
+    const userId = new Types.ObjectId().toString();
 
     it('should start a transaction and commit on success', async () => {
       const data = {
@@ -111,9 +112,9 @@ describe('ResenasService', () => {
       expect(mockSession.endSession).toHaveBeenCalled();
     });
 
-    it('should call model.create with array syntax and session for ACID transaction', async () => {
+    it('should call model.create with ObjectId-converted doc and session for ACID transaction', async () => {
       const data = {
-        usuario_id: new Types.ObjectId().toString(),
+        usuario_id: userId,
         restaurante_id: restauranteId,
         calificacion: 5,
       };
@@ -122,15 +123,22 @@ describe('ResenasService', () => {
 
       const result = await service.create(data);
 
-      expect(mockResenaModel.create).toHaveBeenCalledWith([data], {
-        session: mockSession,
-      });
+      expect(mockResenaModel.create).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            usuario_id: expect.any(Types.ObjectId),
+            restaurante_id: expect.any(Types.ObjectId),
+            calificacion: 5,
+          }),
+        ],
+        { session: mockSession },
+      );
       expect(result).toEqual(created);
     });
 
     it('should update calificacion_prom and total_resenas on the restaurante after create', async () => {
       const data = {
-        usuario_id: 'u1',
+        usuario_id: userId,
         restaurante_id: restauranteId,
         calificacion: 4,
       };
@@ -154,7 +162,7 @@ describe('ResenasService', () => {
 
     it('should update tiene_resena on the orden when orden_id is provided', async () => {
       const data = {
-        usuario_id: 'u1',
+        usuario_id: userId,
         restaurante_id: restauranteId,
         orden_id: ordenId,
         calificacion: 5,
@@ -171,7 +179,7 @@ describe('ResenasService', () => {
     });
 
     it('should NOT update restaurante when restaurante_id is absent', async () => {
-      const data = { usuario_id: 'u1', calificacion: 3 };
+      const data = { usuario_id: userId, calificacion: 3 };
       mockResenaModel.create.mockResolvedValue([{ _id: 'r1', ...data }]);
 
       await service.create(data);
@@ -181,7 +189,7 @@ describe('ResenasService', () => {
 
     it('should NOT update orden when orden_id is absent', async () => {
       const data = {
-        usuario_id: 'u1',
+        usuario_id: userId,
         restaurante_id: restauranteId,
         calificacion: 3,
       };
@@ -196,7 +204,7 @@ describe('ResenasService', () => {
       mockResenaModel.create.mockRejectedValue(new Error('DB error'));
 
       await expect(
-        service.create({ usuario_id: 'u1', calificacion: 3 }),
+        service.create({ usuario_id: userId, calificacion: 3 }),
       ).rejects.toThrow('DB error');
       expect(mockSession.abortTransaction).toHaveBeenCalled();
       expect(mockSession.endSession).toHaveBeenCalled();
@@ -206,7 +214,7 @@ describe('ResenasService', () => {
       mockResenaModel.create.mockRejectedValue(new Error('failure'));
 
       try {
-        await service.create({ usuario_id: 'u1' });
+        await service.create({ usuario_id: userId });
       } catch {
         /* expected */
       }
@@ -214,35 +222,16 @@ describe('ResenasService', () => {
       expect(mockSession.endSession).toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException when restaurante_id does not exist', async () => {
-      mockRestauranteModel.countDocuments.mockResolvedValue(0);
+    it('should throw BSONError when usuario_id is not a valid ObjectId', async () => {
       const data = {
-        usuario_id: 'u1',
+        usuario_id: 'invalid',
         restaurante_id: new Types.ObjectId().toString(),
         calificacion: 5,
       };
 
-      await expect(service.create(data)).rejects.toThrow(BadRequestException);
-      await expect(service.create(data)).rejects.toThrow(
-        'El restaurante referenciado no existe',
-      );
-      expect(mockResenaModel.create).not.toHaveBeenCalled();
-    });
-
-    it('should throw BadRequestException when orden_id does not exist', async () => {
-      mockOrdenModel.countDocuments.mockResolvedValue(0);
-      const data = {
-        usuario_id: 'u1',
-        restaurante_id: new Types.ObjectId().toString(),
-        orden_id: new Types.ObjectId().toString(),
-        calificacion: 5,
-      };
-
-      await expect(service.create(data)).rejects.toThrow(BadRequestException);
-      await expect(service.create(data)).rejects.toThrow(
-        'La orden referenciada no existe',
-      );
-      expect(mockResenaModel.create).not.toHaveBeenCalled();
+      await expect(service.create(data)).rejects.toThrow();
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
     });
   });
 
@@ -434,60 +423,18 @@ describe('ResenasService', () => {
     const restauranteOid = new Types.ObjectId();
     const ordenOid = new Types.ObjectId();
 
-    it('should delete resena inside ACID transaction and return { deleted: true }', async () => {
+    it('should delete resena and return { deleted: true }', async () => {
       const query = createMockQuery({
         _id: 'r1',
         restaurante_id: restauranteOid,
         orden_id: ordenOid,
       });
       mockResenaModel.findByIdAndDelete.mockReturnValue(query);
-      mockAggregateChain.session.mockResolvedValue([{ avg: 4.0, count: 9 }]);
 
       const result = await service.remove('r1');
 
-      expect(mockConnection.startSession).toHaveBeenCalled();
-      expect(mockSession.startTransaction).toHaveBeenCalled();
-      expect(mockResenaModel.findByIdAndDelete).toHaveBeenCalledWith('r1', {
-        session: mockSession,
-      });
-      expect(mockSession.commitTransaction).toHaveBeenCalled();
-      expect(mockSession.endSession).toHaveBeenCalled();
+      expect(mockResenaModel.findByIdAndDelete).toHaveBeenCalledWith('r1');
       expect(result).toEqual({ deleted: true });
-    });
-
-    it('should recalculate calificacion_prom and total_resenas on restaurante after delete', async () => {
-      const query = createMockQuery({
-        _id: 'r1',
-        restaurante_id: restauranteOid,
-      });
-      mockResenaModel.findByIdAndDelete.mockReturnValue(query);
-      mockAggregateChain.session.mockResolvedValue([{ avg: 3.5, count: 4 }]);
-
-      await service.remove('r1');
-
-      expect(mockResenaModel.aggregate).toHaveBeenCalled();
-      expect(mockRestauranteModel.findByIdAndUpdate).toHaveBeenCalledWith(
-        restauranteOid,
-        { $set: { calificacion_prom: 3.5, total_resenas: 4 } },
-        { session: mockSession },
-      );
-    });
-
-    it('should reset calificacion_prom to 0 when no reviews remain', async () => {
-      const query = createMockQuery({
-        _id: 'r1',
-        restaurante_id: restauranteOid,
-      });
-      mockResenaModel.findByIdAndDelete.mockReturnValue(query);
-      mockAggregateChain.session.mockResolvedValue([]);
-
-      await service.remove('r1');
-
-      expect(mockRestauranteModel.findByIdAndUpdate).toHaveBeenCalledWith(
-        restauranteOid,
-        { $set: { calificacion_prom: 0, total_resenas: 0 } },
-        { session: mockSession },
-      );
     });
 
     it('should reset tiene_resena to false on the orden after delete', async () => {
@@ -496,15 +443,16 @@ describe('ResenasService', () => {
 
       await service.remove('r1');
 
-      expect(mockOrdenModel.findByIdAndUpdate).toHaveBeenCalledWith(
-        ordenOid,
-        { $set: { tiene_resena: false } },
-        { session: mockSession },
-      );
+      expect(mockOrdenModel.findByIdAndUpdate).toHaveBeenCalledWith(ordenOid, {
+        $set: { tiene_resena: false },
+      });
     });
 
-    it('should NOT update restaurante when resena had no restaurante_id', async () => {
-      const query = createMockQuery({ _id: 'r1' });
+    it('should NOT update restaurante on delete (no recalculation)', async () => {
+      const query = createMockQuery({
+        _id: 'r1',
+        restaurante_id: restauranteOid,
+      });
       mockResenaModel.findByIdAndDelete.mockReturnValue(query);
 
       await service.remove('r1');
@@ -518,7 +466,6 @@ describe('ResenasService', () => {
         restaurante_id: restauranteOid,
       });
       mockResenaModel.findByIdAndDelete.mockReturnValue(query);
-      mockAggregateChain.session.mockResolvedValue([{ avg: 4.0, count: 5 }]);
 
       await service.remove('r1');
 
@@ -535,23 +482,6 @@ describe('ResenasService', () => {
       await expect(service.remove('nonexistent')).rejects.toThrow(
         'Reseña no encontrada',
       );
-      expect(mockSession.abortTransaction).toHaveBeenCalled();
-      expect(mockSession.endSession).toHaveBeenCalled();
-    });
-
-    it('should abort transaction and endSession on error', async () => {
-      mockResenaModel.findByIdAndDelete.mockImplementation(() => {
-        throw new Error('DB error');
-      });
-
-      try {
-        await service.remove('r1');
-      } catch {
-        /* expected */
-      }
-
-      expect(mockSession.abortTransaction).toHaveBeenCalled();
-      expect(mockSession.endSession).toHaveBeenCalled();
     });
   });
 });

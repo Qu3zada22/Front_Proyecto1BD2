@@ -435,7 +435,7 @@ describe('OrdenesService', () => {
       expect(result).toEqual(ordenes);
     });
 
-    it('should filter by cliente_id converting to ObjectId using usuario_id field', async () => {
+    it('should filter by cliente_id using $or with ObjectId and string for usuario_id field', async () => {
       const clienteId = '507f1f77bcf86cd799439011';
       const query = createMockQuery([]);
       mockOrdenModel.find.mockReturnValue(query);
@@ -443,8 +443,11 @@ describe('OrdenesService', () => {
       await service.findAll({ cliente_id: clienteId });
 
       const callArg = mockOrdenModel.find.mock.calls[0][0];
-      expect(callArg.usuario_id).toBeInstanceOf(Types.ObjectId);
-      expect(callArg.usuario_id.toString()).toBe(clienteId);
+      expect(callArg.$or).toBeDefined();
+      expect(callArg.$or).toHaveLength(2);
+      expect(callArg.$or[0].usuario_id).toBeInstanceOf(Types.ObjectId);
+      expect(callArg.$or[0].usuario_id.toString()).toBe(clienteId);
+      expect(callArg.$or[1].usuario_id).toBe(clienteId);
     });
 
     it('should filter by restaurante_id converting to ObjectId', async () => {
