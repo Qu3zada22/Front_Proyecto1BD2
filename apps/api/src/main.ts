@@ -58,9 +58,9 @@ async function bootstrap() {
     );
   }
 
-  // Health check — fuera del prefix /api para Docker y load balancers
+  // Health check
   const httpAdapter = app.getHttpAdapter();
-  httpAdapter.get('/health', (_req, res) => {
+  httpAdapter.get('/api/health', (_req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
