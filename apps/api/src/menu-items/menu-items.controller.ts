@@ -26,6 +26,16 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 export class MenuItemsController {
   constructor(private readonly menuItemsService: MenuItemsService) {}
 
+  @Post('bulk')
+  @ApiOperation({
+    summary: 'Crear varios platillos',
+    description: 'Inserta múltiples platillos de un mismo restaurante en una sola operación (create con array).',
+  })
+  @ApiBody({ schema: { example: [{ restaurante_id: '...', nombre: 'Tacos', precio: 35, categoria: 'principal' }] } })
+  createMany(@Body() dtos: CreateMenuItemDto[]) {
+    return this.menuItemsService.createMany(dtos);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Crear platillo' })
   create(@Body() dto: CreateMenuItemDto) {

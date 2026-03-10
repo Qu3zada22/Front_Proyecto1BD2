@@ -134,6 +134,10 @@ export const api = {
   getRestaurante: (id: string) =>
     req<any>(`/restaurants/${id}`).then(normalizeRestaurante),
 
+  getNearRestaurantes: (lng: number, lat: number, maxDistance = 5000) =>
+    req<any[]>(`/restaurants/near?lng=${lng}&lat=${lat}&maxDistance=${maxDistance}`)
+      .then((rs) => rs.map(normalizeRestaurante)),
+
   createRestaurante: (data: any) =>
     req<any>('/restaurants', { method: 'POST', body: JSON.stringify(data) })
       .then(normalizeRestaurante),
@@ -158,6 +162,10 @@ export const api = {
   createMenuItem: (data: any) =>
     req<any>('/menu-items', { method: 'POST', body: JSON.stringify(data) })
       .then(normalizeMenuItem),
+
+  createMenuItemsBulk: (data: any[]) =>
+    req<any[]>('/menu-items/bulk', { method: 'POST', body: JSON.stringify(data) })
+      .then((items) => items.map(normalizeMenuItem)),
 
   updateMenuItem: (id: string, data: any) =>
     req<any>(`/menu-items/${id}`, { method: 'PATCH', body: JSON.stringify(data) })

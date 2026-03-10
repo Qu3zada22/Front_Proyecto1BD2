@@ -17,6 +17,43 @@ export class MenuItemsService {
     @InjectModel(Restaurante.name) private restauranteModel: Model<any>,
   ) {}
 
+  async createMany(
+    dtos: CreateMenuItemDto[],
+  ): Promise<MenuItemDocument[]> {
+    if (!dtos.length) throw new BadRequestException('La lista está vacía');
+
+    // Validar restaurante una sola vez
+    const restauranteOid = new Types.ObjectId(dtos[0].restaurante_id);
+    const restExists = await this.restauranteModel.countDocuments({
+      _id: restauranteOid,
+      activo: true,
+    });
+    if (!restExists)
+      throw new BadRequestException(
+        'El restaurante referenciado no existe o está inactivo',
+      );
+
+    const docs = dtos.map((dto) => {
+      const doc: any = {
+        restaurante_id: new Types.ObjectId(dto.restaurante_id),
+        nombre: dto.nombre,
+        precio: dto.precio,
+        categoria: dto.categoria,
+      };
+      if (dto.descripcion !== undefined) doc.descripcion = dto.descripcion;
+      if (dto.etiquetas !== undefined) doc.etiquetas = dto.etiquetas;
+      if (dto.imagen !== undefined) doc.imagen = dto.imagen;
+      if (dto.imagen_id !== undefined)
+        doc.imagen_id = new Types.ObjectId(dto.imagen_id);
+      if (dto.disponible !== undefined) doc.disponible = dto.disponible;
+      if (dto.orden_display !== undefined)
+        doc.orden_display = dto.orden_display;
+      return doc;
+    });
+
+    return this.menuItemModel.create(docs);
+  }
+
   async create(dto: CreateMenuItemDto): Promise<MenuItemDocument> {
     const restauranteOid = new Types.ObjectId(dto.restaurante_id);
     const restExists = await this.restauranteModel.countDocuments({

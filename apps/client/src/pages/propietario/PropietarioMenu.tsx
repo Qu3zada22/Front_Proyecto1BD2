@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { ArrowLeft, Plus, Pencil, Trash2, Eye, EyeOff, Save, X, Upload, ImageIcon, Loader2 } from "lucide-react"
+import { ArrowLeft, Plus, Pencil, Trash2, Eye, EyeOff, Save, X, Upload, ImageIcon, Loader2, ListPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -74,6 +74,11 @@ export default function PropietarioMenu() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
 
+  // Bulk create queue
+  type PendingItem = typeof formData & { _key: number }
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([])
+  const [savingBulk, setSavingBulk] = useState(false)
+
   if (!restaurant || restaurant.propietario_id !== user?._id) {
     return (
       <div className="py-12 text-center">
@@ -107,6 +112,44 @@ export default function PropietarioMenu() {
     setUploadedImageId(null)
     setEditingId(null)
     setShowForm(false)
+    setPendingItems([])
+  }
+
+  const addToPendingList = () => {
+    if (!formData.nombre || !formData.precio || !formData.descripcion) return
+    setPendingItems((prev) => [...prev, { ...formData, _key: Date.now() }])
+    setFormData({ nombre: "", descripcion: "", precio: "", categoria: "principal", etiquetas: "", imagen: "", orden_display: items.length + pendingItems.length + 2 })
+    setImgPreview("")
+    setUploadedImageId(null)
+  }
+
+  const removePending = (key: number) => {
+    setPendingItems((prev) => prev.filter((p) => p._key !== key))
+  }
+
+  const handleBulkCreate = async () => {
+    if (!pendingItems.length) return
+    setSavingBulk(true)
+    try {
+      const payload = pendingItems.map((p) => ({
+        restaurante_id: restId!,
+        nombre: p.nombre,
+        descripcion: p.descripcion,
+        precio: parseFloat(p.precio),
+        categoria: p.categoria,
+        etiquetas: p.etiquetas.split(",").map((t) => t.trim()).filter(Boolean),
+        imagen: p.imagen || undefined,
+        disponible: true,
+        orden_display: p.orden_display,
+      }))
+      await api.createMenuItemsBulk(payload)
+      await fetchItems()
+      resetForm()
+    } catch (err) {
+      console.error("Error en creación masiva:", err)
+    } finally {
+      setSavingBulk(false)
+    }
   }
 
   const startEdit = (item: MenuItem) => {
@@ -346,10 +389,58 @@ export default function PropietarioMenu() {
                 </div>
               </div>
 
-              <Button type="submit" className="mt-1" disabled={uploadingImage || saving}>
-                {saving ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : <><Save size={16} /> {editingId ? "Guardar Cambios" : "Agregar al Menú"}</>}
-              </Button>
+              {editingId ? (
+                <Button type="submit" className="mt-1" disabled={uploadingImage || saving}>
+                  {saving ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Guardar Cambios</>}
+                </Button>
+              ) : (
+                <div className="mt-1 flex gap-2">
+                  <Button type="button" variant="outline" className="flex-1 gap-1.5" disabled={uploadingImage} onClick={addToPendingList}>
+                    <ListPlus size={16} /> Agregar a la lista
+                  </Button>
+                  <Button type="submit" className="flex-1 gap-1.5" disabled={uploadingImage || saving}>
+                    {saving ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : <><Save size={16} /> Crear solo este</>}
+                  </Button>
+                </div>
+              )}
             </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Cola de items pendientes para creación bulk */}
+      {pendingItems.length > 0 && (
+        <Card className="mb-6 border-amber-400/40 shadow-sm">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm text-foreground">
+                Lista pendiente — {pendingItems.length} {pendingItems.length === 1 ? "platillo" : "platillos"}
+              </CardTitle>
+              <Button
+                size="sm"
+                className="gap-1.5"
+                disabled={savingBulk}
+                onClick={handleBulkCreate}
+              >
+                {savingBulk
+                  ? <><Loader2 size={14} className="animate-spin" /> Creando...</>
+                  : <><Plus size={14} /> Crear todos ({pendingItems.length})</>}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 pt-0">
+            {pendingItems.map((p) => (
+              <div key={p._key} className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-sm">
+                <div>
+                  <span className="font-medium">{p.nombre}</span>
+                  <span className="ml-2 text-muted-foreground">Q{parseFloat(p.precio).toFixed(2)}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">{CATEGORY_LABELS[p.categoria]}</span>
+                </div>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => removePending(p._key)}>
+                  <X size={12} />
+                </Button>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
